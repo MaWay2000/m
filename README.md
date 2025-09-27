@@ -1,34 +1,41 @@
-# mozila
+# Auto PR: Chime & Click
 
-Firefox add-on that plays a notification chime when GitHub pull requests you follow become ready for review.
+Auto PR is a Firefox extension that turns Codex task triage and GitHub pull-request handling into a mostly hands-free experience. It watches the ChatGPT Codex task feed for brand-new work, opens the task, marches through Create PR → View PR → Merge → Confirm merge buttons with configurable delays, and keeps every tab in sync with a shared flow timeline, notifications, and audible cues.
 
-## Features
+## Key capabilities
 
-- Polls the GitHub Received Events API for `ready_for_review` pull request events.
-- Shows a desktop notification and plays an audible chime for each newly ready pull request.
-- Stores GitHub credentials using Firefox Sync so they stay in step across browsers.
-- Provides an options page to configure your GitHub username and personal access token.
+- **Automatic task pickup** – Scans the Codex task list for “just now” items (or the first visible task) and opens them after an optional delay, in a new window if desired, while recording task IDs to avoid repeats.
+- **Guided PR workflow** – On the task page it auto-clicks **Create PR**, opens the **View PR** link in a fresh tab, and (when enabled) auto-clicks **Merge pull request** and **Confirm merge** on GitHub with per-step delay controls.
+- **Cross-tab timeline** – Injects a floating timeline overlay showing the current stage (`task open`, `Create PR`, `View PR`, `Merge PR`, `Confirm merge`) and syncs progress across tabs so the automation respects strict ordering when configured.
+- **History and approvals** – Persists task history, recently approved merge URLs, and the latest flow state in extension storage so background, popup, and content scripts share context.
+- **Signals and safeguards** – Plays chimes and desktop notifications at each automated step, optionally closes tabs after completing View/Merge stages, and exposes strict-order toggles to keep the automation predictable.
 
-## Getting started
+## Controls & configuration
 
-1. Generate a GitHub [personal access token](https://github.com/settings/tokens) with the `notifications` scope. Copy the token for later. Fine-grained tokens are supported and do not require any additional configuration.
-2. Open Firefox and browse to `about:debugging#/runtime/this-firefox`.
-3. Click **Load Temporary Add-on…** and choose the `extension/manifest.json` file from this repository.
-4. The add-on icon will appear in your toolbar. Open its preferences to enter your GitHub username and personal access token.
-5. Click **Test now** to trigger an immediate poll. When someone marks a draft pull request ready for review, you will see a notification and hear the chime.
+Open the extension popup or options page to tune behavior without editing code:
+
+- Toggle each automation stage (open task, create, view, merge, confirm) individually.
+- Choose delays (1–60 seconds) and enable/disable per-stage audio cues.
+- Decide whether new tasks open in a separate window, steal focus, or require a “just now” badge.
+- Enable strict ordering to ensure downstream steps wait for upstream ones, and surface a task history viewer with clearing tools.
+- Turn on the floating timeline overlay and debugging logs for deeper visibility.
+
+All preferences are stored via `browser.storage.local`, so they persist across sessions and sync when Firefox Sync is enabled.
+
+## Installation
+
+1. Clone or download this repository.
+2. Open Firefox and visit `about:debugging#/runtime/this-firefox`.
+3. Click **Load Temporary Add-on…** and select this directory’s `manifest.json` file.
+4. Use the toolbar button to open the popup or **Manage Extension** to reach the full options page and configure delays, sounds, and automation stages.
 
 ## Development notes
 
-- The background script polls every minute using the GitHub REST API endpoint `users/:username/received_events`. Only `PullRequestEvent` entries with the `ready_for_review` action generate alerts.
-- Seen event IDs are cached locally to avoid duplicate notifications.
-- The chime is generated with the Web Audio API so no audio asset is required.
+- `background.js` maintains shared state (current task, flow stage, approval list, task history) and responds to messages from content and UI scripts. It also handles notifications, chimes, and tab management.
+- `content.js` injects into `chatgpt.com` and `github.com`, watching for DOM mutations so it can trigger automation steps, mount the timeline overlay, and coordinate with the background script.
+- `popup.js` and `options.js` present the live settings, history viewer, and reset controls that write to shared storage.
+- Run `web-ext run` or `web-ext build` from the repository root to test or package the extension.
 
-## Packaging
+## Permissions
 
-To build a distributable `.xpi`, run:
-
-```bash
-web-ext build --source-dir extension
-```
-
-Then upload the generated archive to [addons.mozilla.org](https://addons.mozilla.org/).
+The extension requests access to `chatgpt.com` and `github.com` domains, tabs, notifications, and storage so it can monitor Codex tasks, orchestrate PR pages, show alerts, and persist shared automation state.
