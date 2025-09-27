@@ -358,6 +358,7 @@ async function autoClickCreatePR(){
   if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
   highlightTimeline(taskId,shared.flow);
+  if(shared.steps&&shared.steps.created) return;
   if(s.strictOrder && shared.flow!=='taskOpened') return;
   const el=findFirst(TEXTS.CREATE); if(!el || el.dataset._autoPrClicked==='1') return;
   await sendMessage('PR_READY',{taskId}); el.dataset._autoPrClicked='1';
@@ -376,6 +377,7 @@ async function handleViewPROpen(){
   if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
   highlightTimeline(taskId,shared.flow);
+  if(shared.steps&&shared.steps.viewed) return;
   if(s.strictOrder && shared.flow!=='created') return;
   const c=qsAll('a,button,summary').filter(el=>visible(el)&&TEXTS.VIEW.test((el.innerText||el.textContent||'').trim()));
   const link=c.find(el=>el.tagName==='A'&&el.href);
@@ -399,6 +401,7 @@ async function autoClickMergePR(){
   if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
   highlightTimeline(taskId,shared.flow);
+  if(shared.steps&&shared.steps.merged) return;
   if(s.strictOrder){ const ok=await sendMessage('CHECK_APPROVED_URL',{url:location.href}); if(!ok||!ok.ok) return; if(shared.flow!=='viewed') return; }
   const el=findFirst(TEXTS.MERGE); if(!el || el.dataset._autoMergeClicked==='1') return;
   const resp=await sendMessage('MERGE_PR_READY',{taskId,url:location.href}); if(resp&&resp.skipped) return;
@@ -418,6 +421,7 @@ async function autoClickConfirmMerge(){
   if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
   highlightTimeline(taskId,shared.flow);
+  if(shared.steps&&shared.steps.confirmed) return;
   if(s.strictOrder && shared.flow!=='merged') return;
   const el=findFirst(TEXTS.CONFIRM); if(!el || el.dataset._autoConfirmMergeClicked==='1') return;
   const resp=await sendMessage('CONFIRM_MERGE_READY',{taskId,url:location.href}); if(resp&&resp.skipped) return;
