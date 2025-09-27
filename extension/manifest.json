@@ -21,7 +21,7 @@
   "commands": {
     "check-now": {
       "suggested_key": {
-        "default": "Ctrl+Shift+."
+        "default": "Ctrl+Shift+Period"
       },
       "description": "Manually check for ready pull requests"
     }
