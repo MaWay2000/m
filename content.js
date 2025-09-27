@@ -395,7 +395,9 @@ async function handleViewPROpen(){
   const key='_autoPrViewHandled';
   if((link&&link.dataset[key]==='1')||(btn&&btn.dataset[key]==='1')) return;
   if(link) link.dataset[key]='1'; if(btn) btn.dataset[key]='1';
-  await sendMessage('VIEW_PR_READY',{url,taskId});
+  const delayMs=Math.max(0,Math.min(60000,Math.round(Number(s.viewDelaySec)*1000)||0));
+  if(delayMs>0) await new Promise(r=>setTimeout(r,delayMs));
+  await sendMessage('VIEW_PR_READY',{url,taskId,delayMs,delayElapsed:true});
   await setSharedFlow('viewed',{step:'viewed',taskId,url});
   highlightTimeline(taskId,'viewed');
 }
