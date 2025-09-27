@@ -360,8 +360,16 @@ async function autoClickCreatePR(){
   highlightTimeline(taskId,shared.flow);
   if(shared.steps&&shared.steps.created) return;
   if(s.strictOrder && shared.flow!=='taskOpened') return;
-  const el=findFirst(TEXTS.CREATE); if(!el || el.dataset._autoPrClicked==='1') return;
-  await sendMessage('PR_READY',{taskId}); el.dataset._autoPrClicked='1';
+  const el=findFirst(TEXTS.CREATE);
+  if(!el || el.dataset._autoPrClicked) return;
+  el.dataset._autoPrClicked='pending';
+  try{
+    await sendMessage('PR_READY',{taskId});
+    el.dataset._autoPrClicked='1';
+  }catch(e){
+    delete el.dataset._autoPrClicked;
+    throw e;
+  }
   const d=Math.max(1,Math.min(60,Number(s.createDelaySec)||1))*1000;
   setTimeout(()=>{ try{ el.click(); } catch(e){ try{ el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); }catch(_){} } }, d);
   await setSharedFlow('created',{step:'created',taskId});
