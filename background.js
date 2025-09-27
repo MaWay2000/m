@@ -4,6 +4,19 @@ const DEFAULTS={strictOrder:true,showTimeline:true,debugLogs:false,openTaskEnabl
 const APPROVAL_TTL_MS=600000; const now=()=>Date.now();
 const getAll=()=>new Promise(r=>{try{API.storage.local.get(DEFAULTS,r);}catch(e){r({...DEFAULTS});}});
 const setObj=(o)=>new Promise(r=>API.storage.local.set(o,()=>r(true)));
+const normalizeUrl=(raw)=>{
+  try{
+    if(!raw) return '';
+    const u=new URL(raw);
+    u.search='';
+    u.hash='';
+    let normalized=`${u.origin}${u.pathname}`;
+    while(normalized.length>u.origin.length && normalized.endsWith('/')) normalized=normalized.slice(0,-1);
+    return normalized;
+  }catch(e){
+    return '';
+  }
+};
 API.runtime.onMessage.addListener((m,s,reply)=>{
   if(!m||!m.type) return;
   const ok=(x={})=>reply&&reply({ok:true, ...x});
@@ -63,8 +76,8 @@ API.runtime.onMessage.addListener((m,s,reply)=>{
   if(m.type==='GET_SEEN_TASKS') return getAll().then(c=>ok({seen:c.seenTaskIds||[]})), true;
   if(m.type==='ADD_SEEN_TASK'){const {id}=m; return getAll().then(c=>{const seen=new Set(c.seenTaskIds||[]); if(id) seen.add(id); return setObj({seenTaskIds:[...seen]}).then(ok);}), true;}
   if(m.type==='CLEAR_SEEN_TASKS') return setObj({seenTaskIds:[]}).then(ok), true;
-  if(m.type==='ADD_APPROVED_URL'){const {url}=m; return getAll().then(c=>{const list=c.approvedMergeUrls||[];list.push({url,exp:now()+APPROVAL_TTL_MS}); return setObj({approvedMergeUrls:list}).then(ok);}), true;}
-  if(m.type==='CHECK_APPROVED_URL'){const {url}=m; return getAll().then(c=>ok({ok:(c.approvedMergeUrls||[]).some(e=>url.startsWith(e.url)&&e.exp>now())})), true;}
+  if(m.type==='ADD_APPROVED_URL'){const {url}=m; return getAll().then(c=>{const normalized=normalizeUrl(url);const list=(c.approvedMergeUrls||[]).filter(e=>e.exp>now());if(normalized) list.push({url:normalized,exp:now()+APPROVAL_TTL_MS}); return setObj({approvedMergeUrls:list}).then(ok);}), true;}
+  if(m.type==='CHECK_APPROVED_URL'){const {url}=m; return getAll().then(c=>{const normalized=normalizeUrl(url);const entries=c.approvedMergeUrls||[];const fresh=entries.filter(e=>e.exp>now());const match=!!normalized&&fresh.some(e=>{const stored=normalizeUrl(e.url);return stored&&(stored.startsWith(normalized)||normalized.startsWith(stored));});const respond=()=>ok({ok:match}); if(fresh.length!==entries.length) return setObj({approvedMergeUrls:fresh}).then(respond); return respond();}), true;}
   function chime(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),t=a.currentTime;const b=(o,f,d,g=.15)=>{const x=a.createOscillator(),n=a.createGain();x.frequency.value=f;n.gain.value=g;x.connect(n).connect(a.destination);x.start(t+o);n.gain.exponentialRampToValueAtTime(.0001,t+o+d);x.stop(t+o+d+.05)};b(0,880,.18);b(.22,659.25,.22);b(.5,880,.18);b(.72,659.25,.22);}catch(e){}}
   function note(t,m){try{API.notifications.create({type:'basic',iconUrl:'icon48.png',title:t,message:m});}catch(e){}}
   if(m.type==='TASK_READY'){
