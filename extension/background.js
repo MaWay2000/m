@@ -44,6 +44,10 @@ async function playChime() {
   }
 }
 
+// Lightweight inline PNG so we do not rely on packaged binary assets.
+const NOTIFICATION_ICON_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAABuklEQVR42u3dy1HEQAwFQMXAlQNnYiEOIiIOItpgIIMtbOx5kt2HCcCvpar9eKR6eX3/cXKnhAAAgAPg6Xn7/N51ACwOfCJIXTnwCSB1x+A7QdSU4D++HpvOFIjqGPzWsI9GuRxAMvT/YIwH6Bh8N4hKhZ8OfivEKIBJwW+BaA8wOfgURAk/i1Bnhj81+L9CtAC4evhnI5Twswgl/CzCoQBXD/8ZwlKAO4d/NEIJP4tQws8iAJgCIPxzEHYDCP45wqEAqv+8LijVn+2CUv3ZLijVn+2CUv3ZLijVn+2CUv3ZLijVn+0CAAAACD+IAAAAAACdAHz+X/t9oFR/tgsAAAAAAAAAAAAAAAAAAAAAAAA6AUBY/GOcLvB/AAAAAO4NAMF7QQAANAOAsPjlXF0Qfj1dFzS4oKELwleUdEGDS3q6IHxNVRc0uKitC8KjCnRBg2EdEMwLAgAhPLIMQoOhfRAefeeGGtxqdPGo8A3vDodvfH04fAscdgbfboGDFSaW+IwL3hqrDcGPW2NlkZtVhu2Dt8zzTss8rbO10NlCZyvNGwOsAun4rC0BjgKZ8GwjAK58AAAAIIjg+QVV18EXEcLTKQAAAABJRU5ErkJggg==";
+
 async function notifyReadyForReview(event) {
   const pr = event.payload.pull_request;
   const title = `PR ready for review: ${pr.title}`;
@@ -51,7 +55,7 @@ async function notifyReadyForReview(event) {
 
   await browserApi.notifications.create(event.id, {
     type: "basic",
-    iconUrl: browserApi.runtime.getURL("icons/icon96.png"),
+    iconUrl: NOTIFICATION_ICON_DATA_URL,
     title,
     message
   });
