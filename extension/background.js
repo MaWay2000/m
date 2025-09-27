@@ -23,25 +23,22 @@ async function saveSeenEvents(eventIds) {
   await browserApi.storage.local.set({ [STORAGE_KEYS.SEEN_EVENTS]: eventIds.slice(0, 50) });
 }
 
-function playChime() {
+let chimeAudio;
+
+async function playChime() {
   try {
-    const context = new (self.AudioContext || self.webkitAudioContext)();
-    const oscillator = context.createOscillator();
-    const gainNode = context.createGain();
+    if (typeof Audio === "undefined") {
+      console.warn("Audio playback not supported in this context");
+      return;
+    }
 
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, context.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(440, context.currentTime + 0.8);
+    if (!chimeAudio) {
+      chimeAudio = new Audio(browserApi.runtime.getURL("go.mp3"));
+      chimeAudio.load();
+    }
 
-    gainNode.gain.setValueAtTime(0.0001, context.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.2, context.currentTime + 0.1);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 1.0);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(context.destination);
-
-    oscillator.start();
-    oscillator.stop(context.currentTime + 1.0);
+    chimeAudio.currentTime = 0;
+    await chimeAudio.play();
   } catch (error) {
     console.error("Unable to play chime", error);
   }
@@ -58,7 +55,7 @@ async function notifyReadyForReview(event) {
     title,
     message
   });
-  playChime();
+  await playChime();
 }
 
 async function fetchReadyEvents(settings) {
