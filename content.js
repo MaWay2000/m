@@ -218,8 +218,30 @@ function highlightTimeline(taskId,flow){
   scheduleTimelineUpdate();
 }
 
-const getSharedFlow=async()=>{const r=await sendMessage('GET_SHARED_FLOW'); return r&&r.ok? r : {taskId:null, flow:'idle'};};
-const setSharedFlow=(flow,extra={})=>sendMessage('SET_SHARED_FLOW',{flow,...extra});
+function guessTaskIdFromLocation(){
+  if(location.hostname.includes('chatgpt.com')) return parseTaskId(location.href);
+  return null;
+}
+
+const getSharedFlow=async(overrides={})=>{
+  const payload={...overrides};
+  if(!payload.taskId) payload.taskId=guessTaskIdFromLocation();
+  if(!payload.taskId) payload.url=payload.url||location.href;
+  const r=await sendMessage('GET_SHARED_FLOW',payload);
+  return r&&r.ok? r : {taskId:payload.taskId||null, flow:'idle'};
+};
+
+const setSharedFlow=async(flow,extra={})=>{
+  const payload={flow,...extra};
+  if(!payload.taskId) payload.taskId=extra.taskId||guessTaskIdFromLocation();
+  if(!payload.taskId){
+    const shared=await getSharedFlow({url:location.href});
+    if(shared&&shared.taskId) payload.taskId=shared.taskId;
+  }
+  if(!payload.taskId) return;
+  payload.url=payload.url||location.href;
+  return sendMessage('SET_SHARED_FLOW',payload);
+};
 
 const isCodexHome=()=>location.hostname.includes('chatgpt.com') && location.pathname.startsWith('/codex') && !/\/codex\/tasks\//.test(location.pathname);
 
@@ -282,23 +304,29 @@ async function autoClickCreatePR(){
   const s=await getSettings(); if(!s.createEnabled) return;
   if(!/\/codex\/tasks\//.test(location.pathname)) return;
   const shared=await getSharedFlow();
+  const taskId=shared.taskId||guessTaskIdFromLocation();
+  if(!taskId) return;
+  if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
-  highlightTimeline(shared.taskId,shared.flow);
+  highlightTimeline(taskId,shared.flow);
   if(s.strictOrder && shared.flow!=='taskOpened') return;
   const el=findFirst(TEXTS.CREATE); if(!el || el.dataset._autoPrClicked==='1') return;
-  await sendMessage('PR_READY'); el.dataset._autoPrClicked='1';
+  await sendMessage('PR_READY',{taskId}); el.dataset._autoPrClicked='1';
   const d=Math.max(1,Math.min(60,Number(s.createDelaySec)||1))*1000;
   setTimeout(()=>{ try{ el.click(); } catch(e){ try{ el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); }catch(_){} } }, d);
-  await setSharedFlow('created',{step:'created'});
-  highlightTimeline(shared.taskId,'created');
+  await setSharedFlow('created',{step:'created',taskId});
+  highlightTimeline(taskId,'created');
 }
 
 async function handleViewPROpen(){
   const s=await getSettings(); if(!s.viewEnabled) return;
   if(!/\/codex\/tasks\//.test(location.pathname)) return;
   const shared=await getSharedFlow();
+  const taskId=shared.taskId||guessTaskIdFromLocation();
+  if(!taskId) return;
+  if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
-  highlightTimeline(shared.taskId,shared.flow);
+  highlightTimeline(taskId,shared.flow);
   if(s.strictOrder && shared.flow!=='created') return;
   const c=qsAll('a,button,summary').filter(el=>visible(el)&&TEXTS.VIEW.test((el.innerText||el.textContent||'').trim()));
   const link=c.find(el=>el.tagName==='A'&&el.href);
@@ -308,41 +336,47 @@ async function handleViewPROpen(){
   const key='_autoPrViewHandled';
   if((link&&link.dataset[key]==='1')||(btn&&btn.dataset[key]==='1')) return;
   if(link) link.dataset[key]='1'; if(btn) btn.dataset[key]='1';
-  await sendMessage('VIEW_PR_READY',{url});
-  await setSharedFlow('viewed',{step:'viewed'});
-  highlightTimeline(shared.taskId,'viewed');
+  await sendMessage('VIEW_PR_READY',{url,taskId});
+  await setSharedFlow('viewed',{step:'viewed',taskId,url});
+  highlightTimeline(taskId,'viewed');
 }
 
 async function autoClickMergePR(){
   const s=await getSettings(); if(!s.mergeEnabled) return;
   if(!location.hostname.includes('github.com')) return;
   const shared=await getSharedFlow();
+  const taskId=shared.taskId||guessTaskIdFromLocation();
+  if(!taskId) return;
+  if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
-  highlightTimeline(shared.taskId,shared.flow);
+  highlightTimeline(taskId,shared.flow);
   if(s.strictOrder){ const ok=await sendMessage('CHECK_APPROVED_URL',{url:location.href}); if(!ok||!ok.ok) return; if(shared.flow!=='viewed') return; }
   const el=findFirst(TEXTS.MERGE); if(!el || el.dataset._autoMergeClicked==='1') return;
-  const resp=await sendMessage('MERGE_PR_READY'); if(resp&&resp.skipped) return;
+  const resp=await sendMessage('MERGE_PR_READY',{taskId,url:location.href}); if(resp&&resp.skipped) return;
   el.dataset._autoMergeClicked='1';
   const d=resp&&typeof resp.delayMs==='number'?resp.delayMs:Math.max(1,Math.min(60,Number(s.mergeDelaySec)||3))*1000;
   setTimeout(()=>{ try{ el.click(); } catch(e){ try{ el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); }catch(_){} } }, d);
-  await setSharedFlow('merged',{step:'merged'});
-  highlightTimeline(shared.taskId,'merged');
+  await setSharedFlow('merged',{step:'merged',taskId,url:location.href});
+  highlightTimeline(taskId,'merged');
 }
 
 async function autoClickConfirmMerge(){
   const s=await getSettings(); if(!s.confirmEnabled) return;
   if(!location.hostname.includes('github.com')) return;
   const shared=await getSharedFlow();
+  const taskId=shared.taskId||guessTaskIdFromLocation();
+  if(!taskId) return;
+  if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
-  highlightTimeline(shared.taskId,shared.flow);
+  highlightTimeline(taskId,shared.flow);
   if(s.strictOrder && shared.flow!=='merged') return;
   const el=findFirst(TEXTS.CONFIRM); if(!el || el.dataset._autoConfirmMergeClicked==='1') return;
-  const resp=await sendMessage('CONFIRM_MERGE_READY'); if(resp&&resp.skipped) return;
+  const resp=await sendMessage('CONFIRM_MERGE_READY',{taskId,url:location.href}); if(resp&&resp.skipped) return;
   el.dataset._autoConfirmMergeClicked='1';
   const d=resp&&typeof resp.delayMs==='number'?resp.delayMs:Math.max(1,Math.min(60,Number(s.confirmDelaySec)||3))*1000;
   setTimeout(()=>{ try{ el.click(); } catch(e){ try{ el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); }catch(_){} } }, d);
-  await setSharedFlow('confirmed',{step:'confirmed'});
-  highlightTimeline(shared.taskId,'confirmed');
+  await setSharedFlow('confirmed',{step:'confirmed',taskId,url:location.href});
+  highlightTimeline(taskId,'confirmed');
 }
 
 function scanOnce(fromPoll=false){ autoOpenTask(); if(!fromPoll){ autoClickCreatePR(); handleViewPROpen(); autoClickMergePR(); autoClickConfirmMerge(); } }
