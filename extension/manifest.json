@@ -1,0 +1,25 @@
+{
+  "manifest_version": 2,
+  "name": "GitHub PR Ready Notifier",
+  "version": "1.0.0",
+  "description": "Notifies you with a chime when pull requests you follow become ready for review.",
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "options_ui": {
+    "page": "options.html",
+    "browser_style": true
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "https://api.github.com/*"
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "pr-ready-notifier@example.com"
+    }
+  }
+}
