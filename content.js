@@ -133,11 +133,12 @@ function updateTimelineTaskLabel(row,taskId){
 
 function applyTimelineFallback(){
   if(!timelineEl) return;
+  timelineEl.style.display='none';
+  timelineEl.style.opacity='0';
   timelineEl.style.top='';
   timelineEl.style.right='';
-  timelineEl.style.bottom='12px';
-  timelineEl.style.left='12px';
-  timelineEl.style.opacity='0.94';
+  timelineEl.style.bottom='';
+  timelineEl.style.left='';
 }
 
 function setTimelineAnchor(row){
@@ -146,6 +147,7 @@ function setTimelineAnchor(row){
   if(same) return;
   timelineAnchorEl=row&&document.documentElement.contains(row)?row:null;
   if(timelineAnchorEl){
+    timelineEl.style.display='flex';
     timelineEl.style.bottom='';
     timelineEl.style.left='';
     timelineEl.style.right='';
@@ -182,6 +184,7 @@ function positionTimeline(){
   const rect=timelineAnchorEl.getBoundingClientRect();
   const width=timelineEl.offsetWidth;
   const height=timelineEl.offsetHeight;
+  timelineEl.style.display='flex';
   let left=rect.right+16;
   if(left+width>window.innerWidth-12){
     left=Math.max(12,rect.left-width-16);
@@ -206,6 +209,10 @@ function mountTimeline(shared,settings){
     clearTimeline();
     return;
   }
+  if(!effectiveTaskId||!flow||flow==='idle'){
+    clearTimeline();
+    return;
+  }
   const maybeSettings=settings?Promise.resolve(settings):getSettings();
   maybeSettings.then(s=>{
     if(!s.showTimeline){
@@ -225,6 +232,10 @@ function mountTimeline(shared,settings){
 }
 
 function highlightTimeline(taskId,flow){
+  if(!flow||flow==='idle'){
+    clearTimeline();
+    return;
+  }
   if(!timelineEl) return;
   if(taskId!==timelineTaskId){
     timelineTaskId=taskId||null;
