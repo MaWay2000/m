@@ -103,13 +103,14 @@ async function processEvents() {
   const settings = await getSettings();
   if (!settings.username) {
     console.debug("GitHub username not configured; skipping poll.");
-    return;
+    return { skipped: true };
   }
 
   try {
     const events = await fetchReadyEvents(settings);
     const seen = await getSeenEvents();
     const newSeen = Array.from(seen);
+    let notificationsSent = 0;
 
     for (const event of events) {
       if (event.type !== "PullRequestEvent" || event.payload.action !== "ready_for_review") {
@@ -122,13 +123,17 @@ async function processEvents() {
 
       await notifyReadyForReview(event);
       newSeen.unshift(event.id);
+      notificationsSent += 1;
     }
 
     if (newSeen.length !== seen.length) {
       await saveSeenEvents(newSeen);
     }
+
+    return { skipped: false, notificationsSent };
   } catch (error) {
     console.error("Failed to process GitHub events", error);
+    throw error;
   }
 }
 
@@ -139,17 +144,33 @@ browserApi.runtime.onInstalled.addListener(async () => {
   if (!settings.username) {
     await saveSettings({ token: "", username: "" });
   }
-  processEvents();
+  try {
+    await processEvents();
+  } catch (error) {
+    console.error("Failed to process events after installation", error);
+  }
 });
 
 browserApi.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "poll") {
-    processEvents();
+    processEvents().catch((error) => {
+      console.error("Failed to process events from alarm", error);
+    });
   }
 });
 
-browserApi.runtime.onMessage.addListener((message) => {
+browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message && message.type === "refresh") {
-    processEvents();
+    (async () => {
+      try {
+        const result = await processEvents();
+        sendResponse({ success: true, result });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        sendResponse({ success: false, error: errorMessage });
+      }
+    })();
+    return true;
   }
+  return false;
 });
