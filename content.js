@@ -9,27 +9,213 @@ const qsAll=(s,r=document)=>Array.from(r.querySelectorAll(s));
 const findFirst=(re)=>qsAll('a,button,summary').find(el=>visible(el)&&re.test((el.innerText||el.textContent||'').trim()));
 const parseTaskId=(href)=>{try{const m=(href||'').match(/\/codex\/tasks\/(task_[\w-]+)/i);return m?m[1]:null;}catch(e){return null;}};
 
-let tlMounted=false;
-function mountTimeline(current){
-  if(tlMounted) return;
-  getSettings().then(s=>{
-    if(!s.showTimeline) return;
-    const w=document.createElement('div');
-    w.id='auto-pr-timeline';
-    w.style.cssText='position:fixed;z-index:2147483647;bottom:12px;left:12px;background:#111;color:#fff;padding:6px 8px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.25);font:12px/1.2 system-ui,sans-serif;display:flex;gap:6px;align-items:center;opacity:.92';
-    const label=document.createElement('span'); label.textContent='Time line:'; label.style.marginRight='6px'; w.appendChild(label);
-    const steps=['taskOpened','created','viewed','merged','confirmed'];
-    const names={taskOpened:'task open', created:'Create PR', viewed:'View PR', merged:'Merge PR', confirmed:'Confirm merge'};
-    steps.forEach(k=>{const pill=document.createElement('span'); pill.textContent=names[k]; pill.dataset.step=k; pill.style.cssText='padding:5px 8px;border:1px solid #666;border-radius:6px;background:#222'; w.appendChild(pill);});
-    document.body.appendChild(w); tlMounted=true; highlightTimeline(current||'idle');
+let timelineEl=null;
+let timelineTaskId=null;
+let timelineAnchorEl=null;
+let timelineListenersAttached=false;
+let timelineUpdateFrame=null;
+
+const TASK_ROW_SELECTOR='li,[role="listitem"],[data-testid*="task"],article,section,div';
+
+function ensureTimelineElement(){
+  if(timelineEl&&document.body.contains(timelineEl)) return timelineEl;
+  if(timelineEl&&timelineEl.parentNode) timelineEl.parentNode.removeChild(timelineEl);
+  timelineEl=document.createElement('div');
+  timelineEl.id='auto-pr-timeline';
+  timelineEl.style.cssText='position:fixed;z-index:2147483647;background:#111;color:#fff;padding:6px 8px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.25);font:12px/1.2 system-ui,sans-serif;display:flex;gap:6px;align-items:center;opacity:.94;pointer-events:none;transition:transform .18s ease,opacity .18s ease';
+  const taskLabel=document.createElement('span');
+  taskLabel.dataset.role='auto-pr-task-label';
+  taskLabel.style.cssText='font-weight:600;color:#c5f442;margin-right:4px;display:none;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis';
+  timelineEl.appendChild(taskLabel);
+  const label=document.createElement('span');
+  label.textContent='Timeline:';
+  label.style.marginRight='6px';
+  timelineEl.appendChild(label);
+  const steps=['taskOpened','created','viewed','merged','confirmed'];
+  const names={taskOpened:'Task open', created:'Create PR', viewed:'View PR', merged:'Merge PR', confirmed:'Confirm merge'};
+  steps.forEach(k=>{
+    const pill=document.createElement('span');
+    pill.textContent=names[k];
+    pill.dataset.step=k;
+    pill.style.cssText='padding:5px 8px;border:1px solid #666;border-radius:6px;background:#222;white-space:nowrap';
+    timelineEl.appendChild(pill);
+  });
+  document.body.appendChild(timelineEl);
+  if(!timelineListenersAttached){
+    window.addEventListener('scroll',scheduleTimelineUpdate,{passive:true});
+    window.addEventListener('resize',scheduleTimelineUpdate,{passive:true});
+    timelineListenersAttached=true;
+  }
+  return timelineEl;
+}
+
+function clearTimeline(){
+  if(timelineEl&&timelineEl.parentNode) timelineEl.parentNode.removeChild(timelineEl);
+  timelineEl=null;
+  timelineTaskId=null;
+  timelineAnchorEl=null;
+}
+
+function findTaskRow(taskId){
+  if(!taskId) return null;
+  const anchors=qsAll(`a[href*="/codex/tasks/${taskId}"]`).filter(visible);
+  for(const a of anchors){
+    const row=a.closest(TASK_ROW_SELECTOR);
+    if(row) return row;
+  }
+  if(location.pathname.includes(taskId)){
+    const main=document.querySelector('main, [role="main"]');
+    if(main) return main;
+  }
+  return null;
+}
+
+function extractTaskTitle(row){
+  if(!row) return '';
+  const headings=qsAll('h1,h2,h3,strong',row);
+  for(const h of headings){
+    const text=(h.innerText||h.textContent||'').trim();
+    if(text) return text.replace(/\s+/g,' ');
+  }
+  const anchor=row.querySelector('a[href*="/codex/tasks/"]');
+  if(anchor){
+    const text=(anchor.innerText||anchor.textContent||'').trim();
+    if(text) return text.replace(/\s+/g,' ');
+  }
+  const text=(row.innerText||row.textContent||'').trim();
+  return text?text.replace(/\s+/g,' ').slice(0,160):'';
+}
+
+function updateTimelineTaskLabel(row,taskId){
+  if(!timelineEl) return;
+  const label=timelineEl.querySelector('[data-role="auto-pr-task-label"]');
+  if(!label) return;
+  if(row){
+    const title=extractTaskTitle(row);
+    if(title){
+      label.textContent=title;
+      label.style.display='inline';
+      return;
+    }
+  }
+  if(taskId){
+    label.textContent=`Task ${taskId}`;
+    label.style.display='inline';
+  }else{
+    label.textContent='';
+    label.style.display='none';
+  }
+}
+
+function applyTimelineFallback(){
+  if(!timelineEl) return;
+  timelineEl.style.top='';
+  timelineEl.style.right='';
+  timelineEl.style.bottom='12px';
+  timelineEl.style.left='12px';
+  timelineEl.style.opacity='0.94';
+}
+
+function setTimelineAnchor(row){
+  if(!timelineEl) return;
+  const same=row&&timelineAnchorEl&&row.isSameNode(timelineAnchorEl);
+  if(same) return;
+  timelineAnchorEl=row&&document.documentElement.contains(row)?row:null;
+  if(timelineAnchorEl){
+    timelineEl.style.bottom='';
+    timelineEl.style.left='';
+    timelineEl.style.right='';
+    timelineEl.style.position='fixed';
+    updateTimelineTaskLabel(timelineAnchorEl,timelineTaskId);
+    scheduleTimelineUpdate();
+  }else{
+    updateTimelineTaskLabel(null,timelineTaskId);
+    applyTimelineFallback();
+  }
+}
+
+function scheduleTimelineUpdate(){
+  if(!timelineEl) return;
+  if(timelineUpdateFrame) return;
+  timelineUpdateFrame=requestAnimationFrame(()=>{
+    timelineUpdateFrame=null;
+    positionTimeline();
   });
 }
-function highlightTimeline(flow){
-  const el=document.getElementById('auto-pr-timeline'); if(!el) return;
-  el.querySelectorAll('span[data-step]').forEach(p=>{
-    if(p.dataset.step===flow){ p.style.background='#c5f442'; p.style.color='#000'; p.style.borderColor='#9bbd2b'; }
-    else { p.style.background='#222'; p.style.color='#fff'; p.style.borderColor='#666'; }
+
+function positionTimeline(){
+  if(!timelineEl) return;
+  if(timelineAnchorEl&&!document.documentElement.contains(timelineAnchorEl)){
+    timelineAnchorEl=null;
+  }
+  if(!timelineAnchorEl && timelineTaskId){
+    setTimelineAnchor(findTaskRow(timelineTaskId));
+  }
+  if(!timelineAnchorEl){
+    applyTimelineFallback();
+    return;
+  }
+  const rect=timelineAnchorEl.getBoundingClientRect();
+  const width=timelineEl.offsetWidth;
+  const height=timelineEl.offsetHeight;
+  let left=rect.right+16;
+  if(left+width>window.innerWidth-12){
+    left=Math.max(12,rect.left-width-16);
+    if(left+width>window.innerWidth-12) left=window.innerWidth-width-12;
+  }
+  let top=rect.top;
+  if(top<12) top=12;
+  if(top+height>window.innerHeight-12) top=Math.max(12,window.innerHeight-height-12);
+  timelineEl.style.left=`${Math.round(left)}px`;
+  timelineEl.style.top=`${Math.round(top)}px`;
+  const outOfView=rect.bottom<0||rect.top>window.innerHeight;
+  timelineEl.style.opacity=outOfView?'0.45':'0.94';
+}
+
+function mountTimeline(shared,settings){
+  const flow=shared&&shared.flow?shared.flow:'idle';
+  const taskId=shared&&shared.taskId?shared.taskId:null;
+  const maybeSettings=settings?Promise.resolve(settings):getSettings();
+  maybeSettings.then(s=>{
+    if(!s.showTimeline){
+      clearTimeline();
+      return;
+    }
+    const el=ensureTimelineElement();
+    el.dataset.taskId=taskId||'';
+    if(taskId!==timelineTaskId){
+      timelineTaskId=taskId;
+      timelineAnchorEl=null;
+    }
+    setTimelineAnchor(findTaskRow(taskId));
+    highlightTimeline(taskId,flow);
   });
+}
+
+function highlightTimeline(taskId,flow){
+  if(!timelineEl) return;
+  if(taskId!==timelineTaskId){
+    timelineTaskId=taskId||null;
+    setTimelineAnchor(findTaskRow(taskId));
+  }
+  const active=flow||'idle';
+  timelineEl.querySelectorAll('span[data-step]').forEach(p=>{
+    if(p.dataset.step===active){
+      p.style.background='#c5f442';
+      p.style.color='#000';
+      p.style.borderColor='#9bbd2b';
+    }else{
+      p.style.background='#222';
+      p.style.color='#fff';
+      p.style.borderColor='#666';
+    }
+  });
+  if(active==='idle'){
+    timelineEl.style.opacity='0.6';
+  }else if(!timelineAnchorEl){
+    timelineEl.style.opacity='0.94';
+  }
+  scheduleTimelineUpdate();
 }
 
 const getSharedFlow=async()=>{const r=await sendMessage('GET_SHARED_FLOW'); return r&&r.ok? r : {taskId:null, flow:'idle'};};
@@ -67,8 +253,13 @@ function startPoll(){
 
 async function autoOpenTask(){
   const s=await getSettings();
-  if(!s.openTaskEnabled || !isCodexHome()) return;
+  const onHome=isCodexHome();
   const shared=await getSharedFlow();
+  if(onHome){
+    mountTimeline(shared,s);
+    highlightTimeline(shared.taskId,shared.flow);
+  }
+  if(!s.openTaskEnabled || !onHome) return;
   if(s.strictOrder && shared.flow!=='idle') return;
   const target = s.openTaskOnlyJustNow ? findJustNowAnchorRobust()
                                        : (qsAll('a[href*="/codex/tasks/"]').find(visible) || null);
@@ -82,25 +273,32 @@ async function autoOpenTask(){
   }
   await sendMessage('TASK_READY',{url:href, taskId:id, title:(target.textContent||'').trim()});
   await setSharedFlow('taskOpened',{taskId:id, step:'opened'});
+  mountTimeline({taskId:id,flow:'taskOpened'},s);
+  highlightTimeline(id,'taskOpened');
   if(pollTimer){ clearInterval(pollTimer); pollTimer=null; }
 }
 
 async function autoClickCreatePR(){
   const s=await getSettings(); if(!s.createEnabled) return;
   if(!/\/codex\/tasks\//.test(location.pathname)) return;
-  const shared=await getSharedFlow(); mountTimeline(shared.flow); highlightTimeline(shared.flow);
+  const shared=await getSharedFlow();
+  mountTimeline(shared,s);
+  highlightTimeline(shared.taskId,shared.flow);
   if(s.strictOrder && shared.flow!=='taskOpened') return;
   const el=findFirst(TEXTS.CREATE); if(!el || el.dataset._autoPrClicked==='1') return;
   await sendMessage('PR_READY'); el.dataset._autoPrClicked='1';
   const d=Math.max(1,Math.min(60,Number(s.createDelaySec)||1))*1000;
   setTimeout(()=>{ try{ el.click(); } catch(e){ try{ el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); }catch(_){} } }, d);
-  await setSharedFlow('created',{step:'created'}); highlightTimeline('created');
+  await setSharedFlow('created',{step:'created'});
+  highlightTimeline(shared.taskId,'created');
 }
 
 async function handleViewPROpen(){
   const s=await getSettings(); if(!s.viewEnabled) return;
   if(!/\/codex\/tasks\//.test(location.pathname)) return;
-  const shared=await getSharedFlow(); mountTimeline(shared.flow); highlightTimeline(shared.flow);
+  const shared=await getSharedFlow();
+  mountTimeline(shared,s);
+  highlightTimeline(shared.taskId,shared.flow);
   if(s.strictOrder && shared.flow!=='created') return;
   const c=qsAll('a,button,summary').filter(el=>visible(el)&&TEXTS.VIEW.test((el.innerText||el.textContent||'').trim()));
   const link=c.find(el=>el.tagName==='A'&&el.href);
@@ -110,33 +308,41 @@ async function handleViewPROpen(){
   const key='_autoPrViewHandled';
   if((link&&link.dataset[key]==='1')||(btn&&btn.dataset[key]==='1')) return;
   if(link) link.dataset[key]='1'; if(btn) btn.dataset[key]='1';
-  await sendMessage('VIEW_PR_READY',{url}); await setSharedFlow('viewed',{step:'viewed'}); highlightTimeline('viewed');
+  await sendMessage('VIEW_PR_READY',{url});
+  await setSharedFlow('viewed',{step:'viewed'});
+  highlightTimeline(shared.taskId,'viewed');
 }
 
 async function autoClickMergePR(){
   const s=await getSettings(); if(!s.mergeEnabled) return;
   if(!location.hostname.includes('github.com')) return;
-  const shared=await getSharedFlow(); mountTimeline(shared.flow); highlightTimeline(shared.flow);
+  const shared=await getSharedFlow();
+  mountTimeline(shared,s);
+  highlightTimeline(shared.taskId,shared.flow);
   if(s.strictOrder){ const ok=await sendMessage('CHECK_APPROVED_URL',{url:location.href}); if(!ok||!ok.ok) return; if(shared.flow!=='viewed') return; }
   const el=findFirst(TEXTS.MERGE); if(!el || el.dataset._autoMergeClicked==='1') return;
   const resp=await sendMessage('MERGE_PR_READY'); if(resp&&resp.skipped) return;
   el.dataset._autoMergeClicked='1';
   const d=resp&&typeof resp.delayMs==='number'?resp.delayMs:Math.max(1,Math.min(60,Number(s.mergeDelaySec)||3))*1000;
   setTimeout(()=>{ try{ el.click(); } catch(e){ try{ el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); }catch(_){} } }, d);
-  await setSharedFlow('merged',{step:'merged'}); highlightTimeline('merged');
+  await setSharedFlow('merged',{step:'merged'});
+  highlightTimeline(shared.taskId,'merged');
 }
 
 async function autoClickConfirmMerge(){
   const s=await getSettings(); if(!s.confirmEnabled) return;
   if(!location.hostname.includes('github.com')) return;
-  const shared=await getSharedFlow(); mountTimeline(shared.flow); highlightTimeline(shared.flow);
+  const shared=await getSharedFlow();
+  mountTimeline(shared,s);
+  highlightTimeline(shared.taskId,shared.flow);
   if(s.strictOrder && shared.flow!=='merged') return;
   const el=findFirst(TEXTS.CONFIRM); if(!el || el.dataset._autoConfirmMergeClicked==='1') return;
   const resp=await sendMessage('CONFIRM_MERGE_READY'); if(resp&&resp.skipped) return;
   el.dataset._autoConfirmMergeClicked='1';
   const d=resp&&typeof resp.delayMs==='number'?resp.delayMs:Math.max(1,Math.min(60,Number(s.confirmDelaySec)||3))*1000;
   setTimeout(()=>{ try{ el.click(); } catch(e){ try{ el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); }catch(_){} } }, d);
-  await setSharedFlow('confirmed',{step:'confirmed'}); highlightTimeline('confirmed');
+  await setSharedFlow('confirmed',{step:'confirmed'});
+  highlightTimeline(shared.taskId,'confirmed');
 }
 
 function scanOnce(fromPoll=false){ autoOpenTask(); if(!fromPoll){ autoClickCreatePR(); handleViewPROpen(); autoClickMergePR(); autoClickConfirmMerge(); } }
