@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Auto PR Settings</title>
+<style>
+body{font:14px/1.4 system-ui,sans-serif;margin:16px}
+.card{border:1px solid #ddd;border-radius:10px;padding:14px;margin:10px 0}
+.row{display:flex;align-items:center;gap:8px;margin:8px 0}
+label{min-width:270px}
+input[type=number]{width:80px}
+.hint{color:#555;font-size:12px}
+.badge{display:inline-block;padding:2px 6px;border-radius:6px;border:1px solid #aaa;margin-right:6px}
+.badge.on{background:#c5f442;color:#000;border-color:#9bbd2b}
+.badge.off{background:#eee;color:#444}
+.task{border-bottom:1px dashed #ddd;padding:6px 0}
+.title{font-weight:600}
+</style>
+</head><body>
+<h2>Auto PR — Settings</h2>
+<div class="card"><h3>Global</h3>
+  <div class="row"><label><input type="checkbox" id="strictOrder"> Strict order</label></div>
+  <div class="row"><label><input type="checkbox" id="showTimeline"> Show timeline ribbon</label></div>
+  <div class="row"><button id="resetFlow">Reset flow approvals</button><span class="hint">Clears PR approvals and resets current flow.</span></div>
+</div>
+<div class="card"><h3>Open Task (chatgpt.com/codex)</h3>
+  <div class="row"><label><input type="checkbox" id="openTaskEnabled"> Enable auto-open</label></div>
+  <div class="row"><label>Delay (1–60 s)</label><input type="number" id="openTaskDelaySec" min="1" max="60"></div>
+  <div class="row"><label><input type="checkbox" id="openTaskSound"> Sound notification</label></div>
+  <div class="row"><label><input type="checkbox" id="openTaskNewWindow"> Open task in a new window</label></div>
+  <div class="row"><label><input type="checkbox" id="openTaskFocus"> Focus the new window</label></div>
+  <div class="row"><label><input type="checkbox" id="openTaskUseHistory"> Use task history (avoid duplicates)</label></div>
+  <div class="row"><label><input type="checkbox" id="openTaskOnlyJustNow"> Only “Just now” rows</label></div>
+  <div class="row"><button id="clearSeen">Clear task ID history</button></div>
+</div>
+<div class="card"><h3>Create PR</h3>
+  <div class="row"><label><input type="checkbox" id="createEnabled"> Enable auto-click</label></div>
+  <div class="row"><label>Delay (1–60 s)</label><input type="number" id="createDelaySec" min="1" max="60"></div>
+  <div class="row"><label><input type="checkbox" id="createSound"> Sound</label></div>
+</div>
+<div class="card"><h3>View PR</h3>
+  <div class="row"><label><input type="checkbox" id="viewEnabled"> Enable auto-open</label></div>
+  <div class="row"><label>Delay (1–60 s)</label><input type="number" id="viewDelaySec" min="1" max="60"></div>
+  <div class="row"><label><input type="checkbox" id="viewSound"> Sound</label></div>
+  <div class="row"><label><input type="checkbox" id="viewCloseEnabled"> Close current tab after opening</label></div>
+  <div class="row"><label>Close delay</label><input type="number" id="viewCloseDelaySec" min="1" max="60"></div>
+</div>
+<div class="card"><h3>Merge PR</h3>
+  <div class="row"><label><input type="checkbox" id="mergeEnabled"> Enable auto-click</label></div>
+  <div class="row"><label>Delay (1–60 s)</label><input type="number" id="mergeDelaySec" min="1" max="60"></div>
+  <div class="row"><label><input type="checkbox" id="mergeSound"> Sound</label></div>
+  <div class="row"><label><input type="checkbox" id="mergeCloseEnabled"> Close tab after click</label></div>
+  <div class="row"><label>Close delay</label><input type="number" id="mergeCloseDelaySec" min="1" max="60"></div>
+</div>
+<div class="card"><h3>Confirm merge</h3>
+  <div class="row"><label><input type="checkbox" id="confirmEnabled"> Enable auto-click</label></div>
+  <div class="row"><label>Delay (1–60 s)</label><input type="number" id="confirmDelaySec" min="1" max="60"></div>
+  <div class="row"><label><input type="checkbox" id="confirmSound"> Sound</label></div>
+</div>
+<div class="card"><h3>Task history</h3>
+  <div id="history"></div>
+  <div class="row"><button id="clearHistory">Clear task history</button></div>
+</div>
+<div class="row"><button id="save">Save</button><span id="status" class="hint"></span></div>
+<script src="options.js"></script>
+</body></html>
