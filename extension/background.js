@@ -159,6 +159,26 @@ browserApi.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
+if (browserApi.commands && browserApi.commands.onCommand) {
+  browserApi.commands.onCommand.addListener((command) => {
+    if (command === "check-now") {
+      processEvents()
+        .then((result) => {
+          if (!result || result.skipped) {
+            console.debug("Shortcut check skipped because username is not configured.");
+          } else {
+            console.debug(
+              `Shortcut check processed events; notifications sent: ${result.notificationsSent}`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to process events from shortcut", error);
+        });
+    }
+  });
+}
+
 browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message && message.type === "refresh") {
     (async () => {

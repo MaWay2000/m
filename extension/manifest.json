@@ -18,6 +18,14 @@
     "https://api.github.com/*",
     "<all_urls>"
   ],
+  "commands": {
+    "check-now": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+."
+      },
+      "description": "Manually check for ready pull requests"
+    }
+  },
   "browser_specific_settings": {
     "gecko": {
       "id": "pr-ready-notifier@example.com"
