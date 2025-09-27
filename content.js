@@ -14,6 +14,7 @@ let timelineTaskId=null;
 let timelineAnchorEl=null;
 let timelineListenersAttached=false;
 let timelineUpdateFrame=null;
+let timelineDismissedId=null;
 
 const TASK_ROW_SELECTOR='li,[role="listitem"],[data-testid*="task"],article,section,div';
 
@@ -22,24 +23,38 @@ function ensureTimelineElement(){
   if(timelineEl&&timelineEl.parentNode) timelineEl.parentNode.removeChild(timelineEl);
   timelineEl=document.createElement('div');
   timelineEl.id='auto-pr-timeline';
-  timelineEl.style.cssText='position:fixed;z-index:2147483647;background:#111;color:#fff;padding:6px 8px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.25);font:12px/1.2 system-ui,sans-serif;display:flex;gap:6px;align-items:center;opacity:.94;pointer-events:none;transition:transform .18s ease,opacity .18s ease';
+  timelineEl.style.cssText='position:fixed;z-index:2147483647;background:#111;color:#fff;padding:6px 8px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.25);font:12px/1.2 system-ui,sans-serif;display:flex;gap:6px;align-items:center;opacity:.94;pointer-events:none;transition:transform .18s ease,opacity .18s ease;cursor:default;';
+  const contentWrap=document.createElement('div');
+  contentWrap.dataset.role='auto-pr-timeline-content';
+  contentWrap.style.cssText='display:flex;gap:6px;align-items:center;pointer-events:auto;';
+  timelineEl.appendChild(contentWrap);
   const taskLabel=document.createElement('span');
   taskLabel.dataset.role='auto-pr-task-label';
-  taskLabel.style.cssText='font-weight:600;color:#c5f442;margin-right:4px;display:none;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis';
-  timelineEl.appendChild(taskLabel);
+  taskLabel.style.cssText='font-weight:600;color:#c5f442;margin-right:4px;display:none;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;pointer-events:none;';
+  contentWrap.appendChild(taskLabel);
   const label=document.createElement('span');
   label.textContent='Timeline:';
-  label.style.marginRight='6px';
-  timelineEl.appendChild(label);
+  label.style.cssText='margin-right:6px;pointer-events:none;';
+  contentWrap.appendChild(label);
   const steps=['taskOpened','created','viewed','merged','confirmed'];
   const names={taskOpened:'Task open', created:'Create PR', viewed:'View PR', merged:'Merge PR', confirmed:'Confirm merge'};
   steps.forEach(k=>{
     const pill=document.createElement('span');
     pill.textContent=names[k];
     pill.dataset.step=k;
-    pill.style.cssText='padding:5px 8px;border:1px solid #666;border-radius:6px;background:#222;white-space:nowrap';
-    timelineEl.appendChild(pill);
+    pill.style.cssText='padding:5px 8px;border:1px solid #666;border-radius:6px;background:#222;white-space:nowrap;pointer-events:none;';
+    contentWrap.appendChild(pill);
   });
+  const cancelBtn=document.createElement('button');
+  cancelBtn.type='button';
+  cancelBtn.textContent='Cancel';
+  cancelBtn.title='Stop tracking this task';
+  cancelBtn.dataset.role='auto-pr-cancel';
+  cancelBtn.style.cssText='margin-left:4px;padding:4px 10px;border-radius:6px;border:1px solid #aa3a3a;background:#2a1111;color:#fbd5d5;font-size:11px;font-weight:600;cursor:pointer;pointer-events:auto;transition:background .2s ease,border-color .2s ease;';
+  cancelBtn.addEventListener('mouseenter',()=>{cancelBtn.style.background='#3b1616';cancelBtn.style.borderColor='#c74c4c';});
+  cancelBtn.addEventListener('mouseleave',()=>{cancelBtn.style.background='#2a1111';cancelBtn.style.borderColor='#aa3a3a';});
+  cancelBtn.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();handleTimelineCancel();});
+  contentWrap.appendChild(cancelBtn);
   document.body.appendChild(timelineEl);
   if(!timelineListenersAttached){
     window.addEventListener('scroll',scheduleTimelineUpdate,{passive:true});
@@ -54,6 +69,15 @@ function clearTimeline(){
   timelineEl=null;
   timelineTaskId=null;
   timelineAnchorEl=null;
+}
+
+async function handleTimelineCancel(){
+  const currentId=timelineTaskId||(timelineEl&&timelineEl.dataset?timelineEl.dataset.taskId:null)||guessTaskIdFromLocation();
+  if(currentId){
+    timelineDismissedId=currentId;
+    await sendMessage('CLEAR_TASK_FLOW',{taskId:currentId});
+  }
+  clearTimeline();
 }
 
 function findTaskRow(taskId){
@@ -175,6 +199,13 @@ function positionTimeline(){
 function mountTimeline(shared,settings){
   const flow=shared&&shared.flow?shared.flow:'idle';
   const taskId=shared&&shared.taskId?shared.taskId:null;
+  const effectiveTaskId=taskId||guessTaskIdFromLocation();
+  if(shared&&shared.dismissedTaskId) timelineDismissedId=shared.dismissedTaskId;
+  if(flow&&flow!=='idle'&&effectiveTaskId&&timelineDismissedId===effectiveTaskId) timelineDismissedId=null;
+  if(effectiveTaskId&&timelineDismissedId===effectiveTaskId&&(flow==='idle'||!flow)){
+    clearTimeline();
+    return;
+  }
   const maybeSettings=settings?Promise.resolve(settings):getSettings();
   maybeSettings.then(s=>{
     if(!s.showTimeline){
@@ -182,13 +213,14 @@ function mountTimeline(shared,settings){
       return;
     }
     const el=ensureTimelineElement();
-    el.dataset.taskId=taskId||'';
-    if(taskId!==timelineTaskId){
-      timelineTaskId=taskId;
+    el.dataset.taskId=(taskId||effectiveTaskId||'');
+    const stateId=taskId||effectiveTaskId||null;
+    if(stateId!==timelineTaskId){
+      timelineTaskId=stateId;
       timelineAnchorEl=null;
     }
-    setTimelineAnchor(findTaskRow(taskId));
-    highlightTimeline(taskId,flow);
+    setTimelineAnchor(findTaskRow(stateId));
+    highlightTimeline(stateId,flow);
   });
 }
 
@@ -197,6 +229,12 @@ function highlightTimeline(taskId,flow){
   if(taskId!==timelineTaskId){
     timelineTaskId=taskId||null;
     setTimelineAnchor(findTaskRow(taskId));
+  }
+  const effectiveTaskId=taskId||guessTaskIdFromLocation();
+  if(flow&&flow!=='idle'&&effectiveTaskId&&timelineDismissedId===effectiveTaskId) timelineDismissedId=null;
+  if(effectiveTaskId&&timelineDismissedId===effectiveTaskId&&(flow==='idle'||!flow)){
+    clearTimeline();
+    return;
   }
   const active=flow||'idle';
   timelineEl.querySelectorAll('span[data-step]').forEach(p=>{
