@@ -15,7 +15,8 @@
     "storage",
     "alarms",
     "notifications",
-    "https://api.github.com/*"
+    "https://api.github.com/*",
+    "<all_urls>"
   ],
   "browser_specific_settings": {
     "gecko": {
