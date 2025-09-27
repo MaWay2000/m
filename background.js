@@ -105,14 +105,17 @@ API.runtime.onMessage.addListener((m,s,reply)=>{
     }), true;
   }
   if(m.type==='VIEW_PR_READY'){
-    const {url,taskId}=m;
+    const {url,taskId,delayMs,delayElapsed}=m;
     const tabId=s&&s.tab&&s.tab.id;
     return getAll().then(c=>{
       if(!c.viewEnabled) return ok({skipped:true});
       if(c.viewSound) chime();
       note('Auto PR','“View PR” — opening…');
-      const d=Math.max(1,Math.min(60,Number(c.viewDelaySec)||1))*1000;
-      setTimeout(()=>{const args={url}; if(s&&s.tab&&typeof s.tab.windowId==='number') args.windowId=s.tab.windowId; try{API.tabs.create(args);}catch(e){}},d);
+      const fallbackDelay=Math.max(1,Math.min(60,Number(c.viewDelaySec)||1))*1000;
+      const waitedAlready=!!(delayElapsed&&typeof delayMs==='number'&&isFinite(delayMs));
+      const effectiveDelay=waitedAlready?0:fallbackDelay;
+      const openTab=()=>{const args={url}; if(s&&s.tab&&typeof s.tab.windowId==='number') args.windowId=s.tab.windowId; try{API.tabs.create(args);}catch(e){}};
+      if(waitedAlready){openTab();}else{setTimeout(openTab,effectiveDelay);}
       API.runtime.sendMessage({type:'ADD_APPROVED_URL',url});
       getAll().then(cc=>{
         const flows={...(cc.taskFlows||{})};
@@ -137,7 +140,7 @@ API.runtime.onMessage.addListener((m,s,reply)=>{
         }
       });
       if(c.viewCloseEnabled && typeof tabId==='number'){
-        const cd=d+Math.max(1,Math.min(60,Number(c.viewCloseDelaySec)||2))*1000;
+        const cd=effectiveDelay+Math.max(1,Math.min(60,Number(c.viewCloseDelaySec)||2))*1000;
         setTimeout(()=>{try{API.tabs.remove(tabId);}catch(e){}},cd);
       }
       ok();
