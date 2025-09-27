@@ -11,7 +11,7 @@ Firefox add-on that plays a notification chime when GitHub pull requests you fol
 
 ## Getting started
 
-1. Generate a GitHub [personal access token](https://github.com/settings/tokens) with the `notifications` scope. Copy the token for later.
+1. Generate a GitHub [personal access token](https://github.com/settings/tokens) with the `notifications` scope. Copy the token for later. Fine-grained tokens are supported and do not require any additional configuration.
 2. Open Firefox and browse to `about:debugging#/runtime/this-firefox`.
 3. Click **Load Temporary Add-on…** and choose the `extension/manifest.json` file from this repository.
 4. The add-on icon will appear in your toolbar. Open its preferences to enter your GitHub username and personal access token.

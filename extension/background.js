@@ -62,13 +62,30 @@ async function notifyReadyForReview(event) {
   await playChime();
 }
 
+function buildAuthorizationHeader(token) {
+  if (!token) {
+    return null;
+  }
+
+  // Fine-grained tokens must use the "Bearer" scheme, while classic tokens
+  // (ghp_, gho_, etc.) continue to work with the legacy "token" scheme. Use
+  // simple prefix heuristics to do the right thing for both formats.
+  if (/^gh[pousr]_/.test(token)) {
+    return `token ${token}`;
+  }
+
+  return `Bearer ${token}`;
+}
+
 async function fetchReadyEvents(settings) {
   const headers = {
-    Accept: "application/vnd.github+json"
+    Accept: "application/vnd.github+json",
+    "User-Agent": "mozila-ready-for-review"
   };
 
-  if (settings.token) {
-    headers.Authorization = `token ${settings.token}`;
+  const authorization = buildAuthorizationHeader(settings.token);
+  if (authorization) {
+    headers.Authorization = authorization;
   }
 
   const response = await fetch(`https://api.github.com/users/${encodeURIComponent(settings.username)}/received_events?per_page=50`, {
