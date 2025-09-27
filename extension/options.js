@@ -28,9 +28,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     browserApi.runtime.sendMessage({ type: "refresh" });
   });
 
-  testButton.addEventListener("click", () => {
+  testButton.addEventListener("click", async () => {
     status.textContent = "Checking GitHub…";
     status.className = "";
-    browserApi.runtime.sendMessage({ type: "refresh" });
+
+    try {
+      const response = await browserApi.runtime.sendMessage({ type: "refresh" });
+
+      if (response && response.success) {
+        status.textContent = "GitHub check completed.";
+        status.className = "success";
+      } else {
+        const errorMessage = response && response.error ? response.error : "Unknown error.";
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      status.textContent = `Failed to check GitHub: ${errorMessage}`;
+      status.className = "error";
+    }
   });
 });
