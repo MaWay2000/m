@@ -357,29 +357,6 @@ function renderHistory(history) {
       }
     }
 
-    const shouldDisplayStatus =
-      statusKey !== "working" && statusKey !== "working on your task";
-
-    if (shouldDisplayStatus) {
-      const statusContainer = document.createElement("span");
-      statusContainer.className = "task-status-container";
-
-      const statusLabel = document.createElement("span");
-      statusLabel.className = "task-status-label";
-      statusLabel.textContent = "Status:";
-
-      const status = document.createElement("span");
-      status.className = "task-status";
-      status.textContent = formatStatusLabel(statusValueRaw);
-      status.classList.add(
-        `task-status--${statusKey.replace(/[^a-z0-9]+/g, "-")}`,
-      );
-
-      statusContainer.append(statusLabel, status);
-
-      header.append(statusContainer);
-    }
-
     if (closeButton) {
       header.append(closeButton);
     }
