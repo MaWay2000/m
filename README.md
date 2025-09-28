@@ -1,11 +1,11 @@
 # Sample WebExtension
 
-This repository contains a minimal Firefox-compatible WebExtension with a background service worker and an interactive popup.
+This repository contains a minimal Firefox-compatible WebExtension with a background script and an interactive popup.
 
 ## Project structure
 
-- `manifest.json` – extension manifest referencing the background service worker and popup UI
-- `src/background.js` – background service worker with installation logging and a sample message handler
+- `manifest.json` – extension manifest referencing the background script and popup UI
+- `src/background.js` – background script with installation logging and a sample message handler
 - `src/popup.html` – popup UI shown when the toolbar button is clicked
 - `src/popup.js` – popup script that sends a message to the background worker
 - `src/popup.css` – basic styles for the popup
