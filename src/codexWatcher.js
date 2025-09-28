@@ -5,10 +5,14 @@ const runtime =
 
 const trackedTasks = new Map();
 const knownTaskNames = new Map();
+const pendingNameRefreshes = new Map();
 const MIN_SQUARE_SIZE = 6;
 const MAX_SQUARE_SIZE = 24;
 const AUTO_CLICK_MAX_ATTEMPTS = 120;
 const AUTO_CLICK_INTERVAL_MS = 500;
+const NAME_REFRESH_INTERVAL_MS = 60 * 1000;
+const MAX_NAME_REFRESH_ATTEMPTS = 30;
+const MAX_NAME_REFRESH_MISSES = 30;
 
 function isTransparentColor(color) {
   if (!color || color === "transparent") {
@@ -135,6 +139,58 @@ function rememberTaskName(taskId, name) {
       knownTaskNames.delete(keys[index]);
     }
   }
+}
+
+function shouldScheduleNameRefresh(name, taskId) {
+  const normalized = normalizeTaskText(name);
+  if (!normalized) {
+    return true;
+  }
+
+  const lower = normalized.toLowerCase();
+  if (taskId && normalized === `Task ${taskId}`) {
+    return true;
+  }
+  if (lower === "unknown task") {
+    return true;
+  }
+  if (/\bworking on your task\b/i.test(lower)) {
+    return true;
+  }
+  if (/\bjust now\b/i.test(lower)) {
+    return true;
+  }
+  if (/\b(?:seconds?|minutes?|hours?|days?)\s+ago\b/i.test(lower)) {
+    return true;
+  }
+  if (/^[0-9:]+$/.test(normalized) && normalized.length <= 5) {
+    return true;
+  }
+  if (normalized.length <= 3) {
+    return true;
+  }
+
+  return false;
+}
+
+function scheduleNameRefresh(taskId, details = {}) {
+  if (!taskId) {
+    return;
+  }
+
+  const existing = pendingNameRefreshes.get(taskId) ?? {};
+  const now = Date.now();
+  const nextRefresh = now + NAME_REFRESH_INTERVAL_MS;
+
+  pendingNameRefreshes.set(taskId, {
+    attempts: existing.attempts ?? 0,
+    nextCheckAt: nextRefresh,
+    url: details.url ?? existing.url ?? null,
+    startedAt: details.startedAt ?? existing.startedAt ?? null,
+    completedAt: details.completedAt ?? existing.completedAt ?? null,
+    lastKnownName: details.name ?? existing.lastKnownName ?? null,
+    missingCount: 0,
+  });
 }
 
 function normalizeTextContent(value) {
@@ -546,6 +602,7 @@ function updateCurrentTaskNameFromConversation() {
 }
 
 function scanForTasks() {
+  const now = Date.now();
   const links = Array.from(document.querySelectorAll('a[href*="/codex/tasks/"]'));
   const seenIds = new Set();
 
@@ -561,6 +618,7 @@ function scanForTasks() {
       link;
     const indicator = findIndicatorElement(container);
     if (indicator) {
+      pendingNameRefreshes.delete(taskId);
       if (!trackedTasks.has(taskId)) {
         const name = extractTaskName(container, link) ?? `Task ${taskId}`;
         rememberTaskName(taskId, name);
@@ -607,6 +665,9 @@ function scanForTasks() {
             updatePayload.startedAt = tracked.startedAt;
           }
           notifyTaskUpdate(updatePayload);
+          if (!shouldScheduleNameRefresh(updatePayload.name, taskId)) {
+            pendingNameRefreshes.delete(taskId);
+          }
         }
       }
     } else if (trackedTasks.has(taskId)) {
@@ -615,14 +676,98 @@ function scanForTasks() {
       if (tracked?.name) {
         rememberTaskName(taskId, tracked.name);
       }
-      notifyTaskReady({
+      const completedAt = new Date().toISOString();
+      const readyPayload = {
         id: taskId,
         status: "ready",
-        completedAt: new Date().toISOString(),
+        completedAt,
         name: tracked?.name,
         url: tracked?.url,
         startedAt: tracked?.startedAt,
-      });
+      };
+      notifyTaskReady(readyPayload);
+      const knownName = knownTaskNames.get(taskId) ?? tracked?.name ?? null;
+      if (shouldScheduleNameRefresh(knownName, taskId)) {
+        scheduleNameRefresh(taskId, {
+          name: knownName,
+          url: readyPayload.url ?? extractTaskUrl(link),
+          startedAt: readyPayload.startedAt,
+          completedAt,
+        });
+      } else {
+        pendingNameRefreshes.delete(taskId);
+      }
+    }
+
+    let pendingRefresh = pendingNameRefreshes.get(taskId);
+
+    if (!indicator && !trackedTasks.has(taskId) && !pendingRefresh) {
+      const knownName = knownTaskNames.get(taskId);
+      if (shouldScheduleNameRefresh(knownName, taskId)) {
+        scheduleNameRefresh(taskId, {
+          name: knownName,
+          url: extractTaskUrl(link),
+        });
+        pendingRefresh = pendingNameRefreshes.get(taskId);
+      }
+    }
+
+    if (pendingRefresh && now >= pendingRefresh.nextCheckAt) {
+      const extractedName = extractTaskName(container, link);
+      const candidates = [
+        extractedName,
+        knownTaskNames.get(taskId),
+        pendingRefresh.lastKnownName,
+      ];
+      let resolvedName = null;
+
+      for (const candidate of candidates) {
+        if (!candidate) {
+          continue;
+        }
+        if (!shouldScheduleNameRefresh(candidate, taskId)) {
+          resolvedName = candidate;
+          break;
+        }
+      }
+
+      if (resolvedName) {
+        rememberTaskName(taskId, resolvedName);
+        const storedName = knownTaskNames.get(taskId);
+        const updatePayload = {
+          id: taskId,
+          status: "ready",
+        };
+        if (storedName) {
+          updatePayload.name = storedName;
+        }
+        const url = extractTaskUrl(link) ?? pendingRefresh.url;
+        if (url) {
+          updatePayload.url = url;
+        }
+        if (pendingRefresh.startedAt) {
+          updatePayload.startedAt = pendingRefresh.startedAt;
+        }
+        if (pendingRefresh.completedAt) {
+          updatePayload.completedAt = pendingRefresh.completedAt;
+        }
+        pendingNameRefreshes.delete(taskId);
+        notifyTaskUpdate(updatePayload);
+      } else {
+        pendingRefresh.attempts = (pendingRefresh.attempts ?? 0) + 1;
+        pendingRefresh.nextCheckAt = now + NAME_REFRESH_INTERVAL_MS;
+        pendingRefresh.lastKnownName = extractedName ?? pendingRefresh.lastKnownName ?? null;
+        const url = extractTaskUrl(link);
+        if (url) {
+          pendingRefresh.url = url;
+        }
+        pendingRefresh.missingCount = 0;
+        if (pendingRefresh.attempts >= MAX_NAME_REFRESH_ATTEMPTS) {
+          pendingNameRefreshes.delete(taskId);
+        } else {
+          pendingNameRefreshes.set(taskId, pendingRefresh);
+        }
+      }
     }
   }
 
@@ -633,14 +778,41 @@ function scanForTasks() {
       if (tracked?.name) {
         rememberTaskName(trackedId, tracked.name);
       }
-      notifyTaskReady({
+      const completedAt = new Date().toISOString();
+      const readyPayload = {
         id: trackedId,
         status: "ready",
-        completedAt: new Date().toISOString(),
+        completedAt,
         name: tracked?.name,
         url: tracked?.url,
         startedAt: tracked?.startedAt,
-      });
+      };
+      notifyTaskReady(readyPayload);
+      const knownName = knownTaskNames.get(trackedId) ?? tracked?.name ?? null;
+      if (shouldScheduleNameRefresh(knownName, trackedId)) {
+        scheduleNameRefresh(trackedId, {
+          name: knownName,
+          url: readyPayload.url,
+          startedAt: readyPayload.startedAt,
+          completedAt,
+        });
+      } else {
+        pendingNameRefreshes.delete(trackedId);
+      }
+    }
+  }
+
+  for (const [pendingId, refresh] of Array.from(pendingNameRefreshes.entries())) {
+    if (seenIds.has(pendingId)) {
+      refresh.missingCount = 0;
+      continue;
+    }
+    const nextMissingCount = (refresh.missingCount ?? 0) + 1;
+    if (nextMissingCount >= MAX_NAME_REFRESH_MISSES) {
+      pendingNameRefreshes.delete(pendingId);
+    } else {
+      refresh.missingCount = nextMissingCount;
+      pendingNameRefreshes.set(pendingId, refresh);
     }
   }
 
