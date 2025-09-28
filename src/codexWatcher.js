@@ -1138,3 +1138,92 @@ if (!window.__codexSquareWatcherInitialized) {
 }
 
 setupCreatePrAutoClick();
+
+function checkTaskStatus(taskId, hintedUrl) {
+  if (!taskId) {
+    return { found: false };
+  }
+
+  const normalizedTaskId = String(taskId).trim();
+  const links = Array.from(document.querySelectorAll('a[href*="/codex/tasks/"]'));
+
+  for (const link of links) {
+    const href = link.getAttribute("href") || link.href;
+    const extractedId = extractTaskId(href);
+    if (!extractedId || extractedId !== normalizedTaskId) {
+      continue;
+    }
+
+    if (hintedUrl) {
+      try {
+        const normalizedUrl = new URL(hintedUrl, window.location.origin).toString();
+        const candidateUrl = extractTaskUrl(link);
+        if (candidateUrl && candidateUrl !== normalizedUrl) {
+          continue;
+        }
+      } catch (error) {
+        // Ignore invalid URL hints and continue with detection.
+      }
+    }
+
+    const container =
+      link.closest('[data-testid*="task" i], article, li, section, div') ??
+      link.parentElement ??
+      link;
+    const indicator = findIndicatorElement(container);
+    const status = indicator ? "working" : "ready";
+    const name = extractTaskName(container, link);
+    if (name) {
+      rememberTaskName(normalizedTaskId, name);
+    }
+    const storedName = knownTaskNames.get(normalizedTaskId) ?? name ?? null;
+    const url = extractTaskUrl(link);
+
+    const payload = {
+      found: true,
+      status,
+      name: storedName,
+      url,
+    };
+
+    if (status === "ready") {
+      payload.completedAt = new Date().toISOString();
+    }
+
+    return payload;
+  }
+
+  const tracked = trackedTasks.get(normalizedTaskId);
+  if (tracked) {
+    return {
+      found: true,
+      status: tracked.status ?? "working",
+      name: tracked.name ?? knownTaskNames.get(normalizedTaskId) ?? null,
+      url: tracked.url ?? null,
+    };
+  }
+
+  const storedName = knownTaskNames.get(normalizedTaskId) ?? null;
+  return { found: false, name: storedName };
+}
+
+if (runtime?.onMessage) {
+  runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message || typeof message !== "object") {
+      return false;
+    }
+
+    if (message.type === "codex-autorun:check-task-status") {
+      try {
+        const result = checkTaskStatus(message.taskId, message.url);
+        sendResponse?.(result);
+      } catch (error) {
+        console.warn("codex-autorun: smart check failed", error);
+        sendResponse?.({ found: false });
+      }
+      return true;
+    }
+
+    return false;
+  });
+}

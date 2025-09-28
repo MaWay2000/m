@@ -222,6 +222,16 @@ button:disabled {
   border-color: #94a3b8;
 }
 
+.task-action.smart-check {
+  border-color: #0f766e;
+  background: #14b8a6;
+}
+
+.task-action.smart-check:hover:not(:disabled) {
+  background: #0d9488;
+  border-color: #0f766e;
+}
+
 #error {
   min-height: 1.25rem;
   color: #b91c1c;
