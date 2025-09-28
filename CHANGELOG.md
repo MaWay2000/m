@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.4 - 2025-09-28
+- Restore automatic handling of ready Codex tasks by opening them in a new tab and marking them as PR created without opening the popup.
+
 # 1.1.3 - 2025-09-28
 - Automatically click the Codex **Create PR** button after opening ready tasks in a new tab.
 
