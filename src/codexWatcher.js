@@ -1207,23 +1207,3 @@ function checkTaskStatus(taskId, hintedUrl) {
   return { found: false, name: storedName };
 }
 
-if (runtime?.onMessage) {
-  runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || typeof message !== "object") {
-      return false;
-    }
-
-    if (message.type === "codex-autorun:check-task-status") {
-      try {
-        const result = checkTaskStatus(message.taskId, message.url);
-        sendResponse?.(result);
-      } catch (error) {
-        console.warn("codex-autorun: smart check failed", error);
-        sendResponse?.({ found: false });
-      }
-      return true;
-    }
-
-    return false;
-  });
-}

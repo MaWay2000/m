@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.13 - 2025-09-28
+- Removed the smart check action from the popup and background services.
+
 # 1.1.12 - 2025-09-28
 - Added a smart check action for in-progress tasks that asks the active Codex tab to verify their latest status.
 - Allow the popup to show feedback when a smart check completes or fails.
