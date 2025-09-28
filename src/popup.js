@@ -200,23 +200,28 @@ function renderHistory(history) {
     const statusValueRaw = task?.status ? String(task.status) : "working";
     const statusKey = statusValueRaw.toLowerCase();
 
-    const statusContainer = document.createElement("span");
-    statusContainer.className = "task-status-container";
+    const shouldDisplayStatus =
+      statusKey !== "working" && statusKey !== "working on your task";
 
-    const statusLabel = document.createElement("span");
-    statusLabel.className = "task-status-label";
-    statusLabel.textContent = "Status:";
+    if (shouldDisplayStatus) {
+      const statusContainer = document.createElement("span");
+      statusContainer.className = "task-status-container";
 
-    const status = document.createElement("span");
-    status.className = "task-status";
-    status.textContent = formatStatusLabel(statusValueRaw);
-    status.classList.add(
-      `task-status--${statusKey.replace(/[^a-z0-9]+/g, "-")}`,
-    );
+      const statusLabel = document.createElement("span");
+      statusLabel.className = "task-status-label";
+      statusLabel.textContent = "Status:";
 
-    statusContainer.append(statusLabel, status);
+      const status = document.createElement("span");
+      status.className = "task-status";
+      status.textContent = formatStatusLabel(statusValueRaw);
+      status.classList.add(
+        `task-status--${statusKey.replace(/[^a-z0-9]+/g, "-")}`,
+      );
 
-    header.append(statusContainer);
+      statusContainer.append(statusLabel, status);
+
+      header.append(statusContainer);
+    }
     content.append(header);
 
     meta.append(idBadge, startedTime);
