@@ -39,3 +39,14 @@ All preferences are stored via `browser.storage.local`, so they persist across s
 ## Permissions
 
 The extension requests access to `chatgpt.com` and `github.com` domains, tabs, notifications, and storage so it can monitor Codex tasks, orchestrate PR pages, show alerts, and persist shared automation state.
+
+## Task status legend
+
+When triaging Codex tasks the UI may display small status indicators for each item. Use them to quickly understand whether a pull request already exists:
+
+- **Open** – A PR has been created and is ready to view.
+- **Merged** – The PR is complete and merged.
+- **Closed** – The task was canceled or otherwise does not need a PR.
+- **No icon** – No pull request has been created yet.
+
+Persisting this mapping in documentation makes it easy to reuse for future coding logic or UI updates.
