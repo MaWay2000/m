@@ -6,6 +6,12 @@ const storage =
   typeof browser !== "undefined" && browser?.storage
     ? browser.storage
     : chrome.storage;
+const tabs =
+  typeof browser !== "undefined" && browser?.tabs
+    ? browser.tabs
+    : chrome?.tabs;
+
+const autoProcessingTasks = new Set();
 
 const HISTORY_KEY = "codexTaskHistory";
 
@@ -108,10 +114,110 @@ async function updateHistory(task) {
   nextHistory[index] = updated;
   await storageSet(HISTORY_KEY, nextHistory);
   console.log("Updated codex task", updated);
+
+  const nextStatus = String(updated.status ?? "").toLowerCase();
+  const previousStatus = String(existing.status ?? "").toLowerCase();
+  const becameReady =
+    nextStatus === "ready" &&
+    previousStatus !== "ready" &&
+    previousStatus !== "pr-created";
+
+  if (becameReady) {
+    autoHandleReadyTask(updated).catch((error) => {
+      console.error("Failed to auto-handle ready Codex task", error);
+    });
+  }
 }
 
 async function getHistory() {
   return (await storageGet(HISTORY_KEY)) ?? [];
+}
+
+function openTaskInNewTab(url) {
+  if (!url) {
+    return Promise.resolve();
+  }
+  if (!tabs?.create) {
+    return Promise.reject(new Error("Tabs API is unavailable."));
+  }
+
+  try {
+    const result = tabs.create({ url });
+    if (result && typeof result.then === "function") {
+      return result.then(() => {});
+    }
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      tabs.create({ url }, () => {
+        const error = runtime?.lastError;
+        if (error) {
+          reject(new Error(error.message));
+          return;
+        }
+        resolve();
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+async function markTaskAsPrCreated(task) {
+  if (!task?.id) {
+    return;
+  }
+
+  const history = (await storageGet(HISTORY_KEY)) ?? [];
+  const index = history.findIndex((entry) => entry.id === task.id);
+  if (index === -1) {
+    return;
+  }
+
+  const existing = history[index];
+  if (String(existing?.status ?? "").toLowerCase() === "pr-created") {
+    return;
+  }
+
+  const completedAt =
+    existing?.completedAt ?? task?.completedAt ?? new Date().toISOString();
+  const updated = {
+    ...existing,
+    status: "pr-created",
+    completedAt,
+  };
+
+  const nextHistory = [...history];
+  nextHistory[index] = updated;
+  await storageSet(HISTORY_KEY, nextHistory);
+  console.log("Marked Codex task as PR created", updated);
+}
+
+async function autoHandleReadyTask(task) {
+  if (!task?.id || !task?.url) {
+    return;
+  }
+
+  if (autoProcessingTasks.has(task.id)) {
+    return;
+  }
+
+  autoProcessingTasks.add(task.id);
+
+  try {
+    await openTaskInNewTab(task.url);
+    await markTaskAsPrCreated({
+      id: task.id,
+      completedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Failed to auto-open Codex task", error);
+  } finally {
+    autoProcessingTasks.delete(task.id);
+  }
 }
 
 runtime.onMessage.addListener((message, sender, sendResponse) => {
