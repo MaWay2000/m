@@ -190,6 +190,31 @@ function normalizeTaskText(value) {
   return cleanedSegments.join(" · ");
 }
 
+function looksLikeIdeaTag(text) {
+  const normalized = normalizeTaskText(text);
+  if (!normalized) {
+    return false;
+  }
+  const words = normalized.split(/\s+/);
+  if (words.length !== 2) {
+    return false;
+  }
+  if (normalized.length < 8 || normalized.length > 40) {
+    return false;
+  }
+  if (!words.every((word) => /^[A-Za-z][A-Za-z0-9+/&-]*$/.test(word))) {
+    return false;
+  }
+  const uppercaseWordCount = words.filter((word) => /^[A-Z]/.test(word)).length;
+  if (!uppercaseWordCount) {
+    return false;
+  }
+  const hasDistinctiveWord = words.some(
+    (word) => word.length >= 5 || /^[A-Z]{2,}$/.test(word),
+  );
+  return hasDistinctiveWord;
+}
+
 function isMeaningfulTaskText(text) {
   const normalized = normalizeTaskText(text);
   if (!normalized) {
@@ -209,7 +234,7 @@ function isMeaningfulTaskText(text) {
     }
   }
   const wordCount = normalized.split(/\s+/).length;
-  if (wordCount < 3 && normalized.length < 20) {
+  if (wordCount < 3 && normalized.length < 20 && !looksLikeIdeaTag(normalized)) {
     return false;
   }
   return true;
@@ -301,36 +326,64 @@ function extractTaskName(container, link) {
     return fallback || null;
   }
 
+  let preferredCandidate = null;
   for (const selector of PREFERRED_TASK_TEXT_SELECTORS) {
     const preferred = container.querySelector(selector);
     const text = normalizeTaskText(preferred?.textContent);
     if (isMeaningfulTaskText(text)) {
-      return text;
+      preferredCandidate = { text, element: preferred };
+      break;
     }
   }
 
   const textCandidates = collectTaskTextCandidates(container);
-  let bestCandidate = null;
-  let bestScore = -Infinity;
+  if (preferredCandidate) {
+    textCandidates.unshift(preferredCandidate);
+  }
+
+  let bestMainCandidate = null;
+  let bestMainScore = -Infinity;
+  let bestTagCandidate = null;
+  let bestTagScore = -Infinity;
   const seen = new Set();
 
   for (const candidate of textCandidates) {
-    if (!isMeaningfulTaskText(candidate.text)) {
+    if (!candidate?.text) {
       continue;
     }
     if (seen.has(candidate.text)) {
       continue;
     }
     seen.add(candidate.text);
-    const score = scoreTaskText(candidate.text, candidate.element);
-    if (score > bestScore) {
-      bestScore = score;
-      bestCandidate = candidate.text;
+
+    const text = candidate.text;
+    const isTag = looksLikeIdeaTag(text);
+    if (!isTag && !isMeaningfulTaskText(text)) {
+      continue;
+    }
+
+    const score = scoreTaskText(text, candidate.element);
+
+    if (isTag && score > bestTagScore) {
+      bestTagScore = score;
+      bestTagCandidate = text;
+    }
+
+    if (score > bestMainScore) {
+      bestMainScore = score;
+      bestMainCandidate = text;
     }
   }
 
-  if (bestCandidate) {
-    return bestCandidate;
+  if (bestMainCandidate) {
+    if (
+      bestTagCandidate &&
+      bestTagCandidate !== bestMainCandidate &&
+      !bestMainCandidate.toLowerCase().includes(bestTagCandidate.toLowerCase())
+    ) {
+      return `${bestMainCandidate} · ${bestTagCandidate}`;
+    }
+    return bestMainCandidate;
   }
 
   const fallbackCandidate =
@@ -339,7 +392,19 @@ function extractTaskName(container, link) {
   const fallbackText = normalizeTaskText(
     fallbackCandidate?.textContent ?? link?.textContent ?? container?.textContent,
   );
-  return fallbackText || null;
+
+  if (fallbackText) {
+    if (
+      bestTagCandidate &&
+      bestTagCandidate !== fallbackText &&
+      !fallbackText.toLowerCase().includes(bestTagCandidate.toLowerCase())
+    ) {
+      return `${fallbackText} · ${bestTagCandidate}`;
+    }
+    return fallbackText;
+  }
+
+  return bestTagCandidate || null;
 }
 
 function extractConversationTaskName() {
