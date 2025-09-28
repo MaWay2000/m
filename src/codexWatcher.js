@@ -570,6 +570,44 @@ function scanForTasks() {
         const task = { name: storedName, url, startedAt, status: "working" };
         trackedTasks.set(taskId, task);
         notifyBackground({ id: taskId, ...task });
+      } else {
+        const tracked = trackedTasks.get(taskId);
+        let updated = false;
+
+        const extractedName = extractTaskName(container, link);
+        if (extractedName) {
+          rememberTaskName(taskId, extractedName);
+          const storedName = knownTaskNames.get(taskId) ?? extractedName;
+          if (storedName && storedName !== tracked?.name) {
+            if (tracked) {
+              tracked.name = storedName;
+            }
+            updated = true;
+          }
+        }
+
+        const url = extractTaskUrl(link);
+        if (url && tracked && url !== tracked.url) {
+          tracked.url = url;
+          updated = true;
+        }
+
+        if (updated && tracked) {
+          const updatePayload = {
+            id: taskId,
+            status: tracked.status ?? "working",
+          };
+          if (tracked.name) {
+            updatePayload.name = tracked.name;
+          }
+          if (tracked.url) {
+            updatePayload.url = tracked.url;
+          }
+          if (tracked.startedAt) {
+            updatePayload.startedAt = tracked.startedAt;
+          }
+          notifyTaskUpdate(updatePayload);
+        }
       }
     } else if (trackedTasks.has(taskId)) {
       const tracked = trackedTasks.get(taskId);

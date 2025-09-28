@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.9 - 2025-09-28
+- Refresh task names while Codex is still working so the popup stays aligned with the UI.
+
 # 1.1.8 - 2025-09-28
 - Added dedicated SVG toolbar icons so the codex-autorun button is visible in the menu bar again.
 
