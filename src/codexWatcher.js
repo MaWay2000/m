@@ -128,6 +128,23 @@ function notifyBackground(task) {
   }
 }
 
+function notifyTaskReady(task) {
+  if (!runtime?.sendMessage) {
+    return;
+  }
+  try {
+    const result = runtime.sendMessage({
+      type: "square-status-updated",
+      task,
+    });
+    if (result && typeof result.catch === "function") {
+      result.catch(() => {});
+    }
+  } catch (error) {
+    console.warn("codex-autorun: failed to notify ready status", error);
+  }
+}
+
 function scanForTasks() {
   const links = Array.from(document.querySelectorAll('a[href*="/codex/tasks/"]'));
   const seenIds = new Set();
@@ -148,17 +165,36 @@ function scanForTasks() {
         const name = extractTaskName(container, link) ?? `Task ${taskId}`;
         const url = extractTaskUrl(link);
         const startedAt = new Date().toISOString();
-        trackedTasks.set(taskId, { name, url, startedAt });
-        notifyBackground({ id: taskId, name, url, startedAt, status: "working" });
+        const task = { name, url, startedAt, status: "working" };
+        trackedTasks.set(taskId, task);
+        notifyBackground({ id: taskId, ...task });
       }
     } else if (trackedTasks.has(taskId)) {
+      const tracked = trackedTasks.get(taskId);
       trackedTasks.delete(taskId);
+      notifyTaskReady({
+        id: taskId,
+        status: "ready",
+        completedAt: new Date().toISOString(),
+        name: tracked?.name,
+        url: tracked?.url,
+        startedAt: tracked?.startedAt,
+      });
     }
   }
 
   for (const trackedId of Array.from(trackedTasks.keys())) {
     if (!seenIds.has(trackedId)) {
+      const tracked = trackedTasks.get(trackedId);
       trackedTasks.delete(trackedId);
+      notifyTaskReady({
+        id: trackedId,
+        status: "ready",
+        completedAt: new Date().toISOString(),
+        name: tracked?.name,
+        url: tracked?.url,
+        startedAt: tracked?.startedAt,
+      });
     }
   }
 }

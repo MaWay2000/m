@@ -82,6 +82,34 @@ async function appendHistory(task) {
   console.log("Tracked codex task", entry);
 }
 
+async function updateHistory(task) {
+  if (!task?.id) {
+    return;
+  }
+  const history = (await storageGet(HISTORY_KEY)) ?? [];
+  const index = history.findIndex((entry) => entry.id === task.id);
+  if (index === -1) {
+    return;
+  }
+  const existing = history[index];
+  const updates = { ...task };
+  for (const key of Object.keys(updates)) {
+    if (updates[key] === undefined) {
+      delete updates[key];
+    }
+  }
+  const updated = {
+    ...existing,
+    ...updates,
+    status: updates.status ?? existing.status,
+    completedAt: updates.completedAt ?? existing.completedAt ?? null,
+  };
+  const nextHistory = [...history];
+  nextHistory[index] = updated;
+  await storageSet(HISTORY_KEY, nextHistory);
+  console.log("Updated codex task", updated);
+}
+
 async function getHistory() {
   return (await storageGet(HISTORY_KEY)) ?? [];
 }
@@ -102,6 +130,17 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
       () => sendResponse?.({ type: "ack" }),
       (error) => {
         console.error("Failed to append task history", error);
+        sendResponse?.({ type: "error", message: String(error) });
+      },
+    );
+    return true;
+  }
+
+  if (message.type === "square-status-updated") {
+    updateHistory(message.task).then(
+      () => sendResponse?.({ type: "ack" }),
+      (error) => {
+        console.error("Failed to update task history", error);
         sendResponse?.({ type: "error", message: String(error) });
       },
     );
