@@ -14,6 +14,7 @@ const tabs =
 const autoProcessingTasks = new Set();
 
 const HISTORY_KEY = "codexTaskHistory";
+const CLOSED_TASKS_KEY = "codexClosedTaskIds";
 
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -52,6 +53,62 @@ function resolveTaskName(candidateName, taskId) {
     return sanitized;
   }
   return taskId ? `Task ${taskId}` : "Unknown task";
+}
+
+function normalizeTaskId(taskId) {
+  if (taskId === null || taskId === undefined) {
+    return "";
+  }
+  const normalized = String(taskId).trim();
+  return normalized;
+}
+
+async function readClosedTasks() {
+  const raw = (await storageGet(CLOSED_TASKS_KEY)) ?? [];
+  const set = new Set();
+  const list = [];
+
+  if (Array.isArray(raw)) {
+    for (const value of raw) {
+      const id = normalizeTaskId(value);
+      if (id && !set.has(id)) {
+        set.add(id);
+        list.push(id);
+      }
+    }
+  }
+
+  return { set, list };
+}
+
+async function markTaskClosed(taskId) {
+  const id = normalizeTaskId(taskId);
+  if (!id) {
+    return;
+  }
+
+  const history = (await storageGet(HISTORY_KEY)) ?? [];
+  const { set: closedSet, list } = await readClosedTasks();
+
+  const nextHistory = Array.isArray(history)
+    ? history.filter((entry) => normalizeTaskId(entry?.id) !== id)
+    : [];
+
+  const updates = [];
+  if (Array.isArray(history) && nextHistory.length !== history.length) {
+    updates.push(storageSet(HISTORY_KEY, nextHistory));
+  }
+
+  if (!closedSet.has(id)) {
+    closedSet.add(id);
+    updates.push(storageSet(CLOSED_TASKS_KEY, [...closedSet]));
+  } else if (list.length !== closedSet.size) {
+    updates.push(storageSet(CLOSED_TASKS_KEY, [...closedSet]));
+  }
+
+  if (updates.length) {
+    await Promise.all(updates);
+  }
 }
 
 console.log("codex-autorun background service worker loaded.");
@@ -107,17 +164,22 @@ function storageSet(key, value) {
 }
 
 async function appendHistory(task) {
-  if (!task?.id) {
+  const id = normalizeTaskId(task?.id);
+  if (!id) {
+    return;
+  }
+  const { set: closedSet } = await readClosedTasks();
+  if (closedSet.has(id)) {
     return;
   }
   const history = (await storageGet(HISTORY_KEY)) ?? [];
-  const exists = history.some((entry) => entry.id === task.id);
+  const exists = history.some((entry) => normalizeTaskId(entry?.id) === id);
   if (exists) {
     return;
   }
   const entry = {
-    id: task.id,
-    name: resolveTaskName(task.name, task.id),
+    id,
+    name: resolveTaskName(task.name, id),
     url: task.url ?? null,
     startedAt: task.startedAt ?? new Date().toISOString(),
     status: task.status ?? "working",
@@ -128,17 +190,22 @@ async function appendHistory(task) {
 }
 
 async function updateHistory(task) {
-  if (!task?.id) {
+  const id = normalizeTaskId(task?.id);
+  if (!id) {
+    return;
+  }
+  const { set: closedSet } = await readClosedTasks();
+  if (closedSet.has(id)) {
     return;
   }
   const history = (await storageGet(HISTORY_KEY)) ?? [];
-  const index = history.findIndex((entry) => entry.id === task.id);
+  const index = history.findIndex((entry) => normalizeTaskId(entry?.id) === id);
 
   if (index === -1) {
     const sanitizedName = sanitizeTaskName(task?.name);
     const entry = {
-      id: task.id,
-      name: resolveTaskName(sanitizedName || task?.name, task.id),
+      id,
+      name: resolveTaskName(sanitizedName || task?.name, id),
       url: task?.url ?? null,
       startedAt: task?.startedAt ?? new Date().toISOString(),
       status: task?.status ?? "working",
@@ -168,10 +235,11 @@ async function updateHistory(task) {
   const updated = {
     ...existing,
     ...updates,
+    id,
     status: updates.status ?? existing.status,
     completedAt: updates.completedAt ?? existing.completedAt ?? null,
   };
-  updated.name = resolveTaskName(updated.name ?? existing.name, task.id);
+  updated.name = resolveTaskName(updated.name ?? existing.name, id);
   const nextHistory = [...history];
   nextHistory[index] = updated;
   await storageSet(HISTORY_KEY, nextHistory);
@@ -193,18 +261,42 @@ async function updateHistory(task) {
 
 async function getHistory() {
   const history = (await storageGet(HISTORY_KEY)) ?? [];
+  const { set: closedSet } = await readClosedTasks();
+
+  if (!Array.isArray(history)) {
+    return [];
+  }
+
   let requiresUpdate = false;
-  const normalizedHistory = history.map((entry) => {
-    if (!entry?.id) {
-      return entry;
+  const normalizedHistory = [];
+
+  for (const entry of history) {
+    if (!entry || typeof entry !== "object") {
+      normalizedHistory.push(entry);
+      continue;
     }
-    const resolvedName = resolveTaskName(entry.name, entry.id);
-    if (resolvedName !== entry.name) {
+
+    let nextEntry = entry;
+    const normalizedId = normalizeTaskId(entry.id);
+
+    if (normalizedId && normalizedId !== entry.id) {
+      nextEntry = { ...nextEntry, id: normalizedId };
       requiresUpdate = true;
-      return { ...entry, name: resolvedName };
     }
-    return entry;
-  });
+
+    if (normalizedId && closedSet.has(normalizedId)) {
+      requiresUpdate = true;
+      continue;
+    }
+
+    const resolvedName = resolveTaskName(nextEntry.name, normalizedId || nextEntry.id);
+    if (resolvedName !== nextEntry.name) {
+      nextEntry = { ...nextEntry, name: resolvedName };
+      requiresUpdate = true;
+    }
+
+    normalizedHistory.push(nextEntry);
+  }
 
   if (requiresUpdate) {
     await storageSet(HISTORY_KEY, normalizedHistory);
@@ -247,12 +339,18 @@ function openTaskInNewTab(url) {
 }
 
 async function markTaskAsPrCreated(task) {
-  if (!task?.id) {
+  const id = normalizeTaskId(task?.id);
+  if (!id) {
+    return;
+  }
+
+  const { set: closedSet } = await readClosedTasks();
+  if (closedSet.has(id)) {
     return;
   }
 
   const history = (await storageGet(HISTORY_KEY)) ?? [];
-  const index = history.findIndex((entry) => entry.id === task.id);
+  const index = history.findIndex((entry) => normalizeTaskId(entry?.id) === id);
   if (index === -1) {
     return;
   }
@@ -266,6 +364,7 @@ async function markTaskAsPrCreated(task) {
     existing?.completedAt ?? task?.completedAt ?? new Date().toISOString();
   const updated = {
     ...existing,
+    id,
     status: "pr-created",
     completedAt,
   };
@@ -338,6 +437,17 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
       (history) => sendResponse?.({ type: "history", history }),
       (error) => {
         console.error("Failed to load task history", error);
+        sendResponse?.({ type: "error", message: String(error) });
+      },
+    );
+    return true;
+  }
+
+  if (message.type === "close-history-task") {
+    markTaskClosed(message.taskId).then(
+      () => sendResponse?.({ type: "ack" }),
+      (error) => {
+        console.error("Failed to close task history entry", error);
         sendResponse?.({ type: "error", message: String(error) });
       },
     );

@@ -148,6 +148,44 @@ button:disabled {
   gap: 0.5rem;
 }
 
+.task-close {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #dc2626;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.task-close:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.task-close:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.task-close:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+.task-close:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .task-meta {
   display: flex;
   flex-wrap: wrap;
