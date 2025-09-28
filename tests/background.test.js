@@ -104,3 +104,16 @@ test("sanitizeTaskName still strips bare repository slugs", () => {
     "Repository-like task names should still resolve to the fallback",
   );
 });
+
+test("sanitizeTaskName strips committing changes placeholder", () => {
+  assert.strictEqual(
+    sanitizeTaskName("Committing changes"),
+    "",
+    "Progress placeholders should be removed from task names",
+  );
+  assert.strictEqual(
+    resolveTaskName("Committing changes", "789"),
+    "Task 789",
+    "Progress placeholders should resolve to the fallback task id",
+  );
+});

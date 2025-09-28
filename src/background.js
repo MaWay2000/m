@@ -19,6 +19,7 @@ const CLOSED_TASKS_KEY = "codexClosedTaskIds";
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
   /just now/gi,
+  /committing changes?/gi,
 ];
 
 function sanitizeTaskName(value) {
