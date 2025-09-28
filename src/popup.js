@@ -8,6 +8,8 @@ const autoCreatePrTasks = new Set();
 let autoCreatePrQueue = Promise.resolve();
 const pendingSmartChecks = new Set();
 
+const MAX_AUTO_CREATE_PR_AGE_MS = 5 * 60 * 1000;
+
 function sendMessage(message) {
   if (typeof browser !== "undefined" && browser?.runtime?.sendMessage) {
     return browser.runtime.sendMessage(message);
@@ -126,6 +128,21 @@ async function handleCreatePr(button, task) {
     button.disabled = false;
   }
   return success;
+}
+
+function isRecentTaskCompletion(task) {
+  if (!task?.completedAt) {
+    return false;
+  }
+  const completedTime = Date.parse(task.completedAt);
+  if (!Number.isFinite(completedTime)) {
+    return false;
+  }
+  const now = Date.now();
+  if (Number.isNaN(now) || now < completedTime) {
+    return false;
+  }
+  return now - completedTime <= MAX_AUTO_CREATE_PR_AGE_MS;
 }
 
 function queueAutoCreatePr(button, task) {
@@ -278,6 +295,11 @@ function renderHistory(history) {
     actions.className = "task-actions";
     let hasActions = false;
 
+    const shouldAutoCreatePr =
+      statusKey === "ready" &&
+      task?.url &&
+      isRecentTaskCompletion(task);
+
     if (statusKey === "ready" && task?.url) {
       const createPrButton = document.createElement("button");
       createPrButton.type = "button";
@@ -287,9 +309,11 @@ function renderHistory(history) {
       actions.append(createPrButton);
       hasActions = true;
 
-      queueMicrotask(() => {
-        queueAutoCreatePr(createPrButton, task);
-      });
+      if (shouldAutoCreatePr) {
+        queueMicrotask(() => {
+          queueAutoCreatePr(createPrButton, task);
+        });
+      }
     }
 
     if (task?.url && statusKey !== "ready") {
