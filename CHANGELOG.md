@@ -1,5 +1,9 @@
 # Changelog
 
+# 1.1.12 - 2025-09-28
+- Added a smart check action for in-progress tasks that asks the active Codex tab to verify their latest status.
+- Allow the popup to show feedback when a smart check completes or fails.
+
 # 1.1.11 - 2025-09-28
 - Added toolbar icon sizes to the manifest icon map so Safari keeps the codex-autorun button visible in the menu bar.
 
