@@ -282,6 +282,36 @@ async function handleSmartCheck(button, task) {
   }
 }
 
+async function handleCloseTask(button, taskId) {
+  if (!taskId) {
+    return;
+  }
+
+  errorOutput.textContent = "";
+  button.disabled = true;
+
+  try {
+    const response = await sendMessage({
+      type: "close-history-task",
+      taskId,
+    });
+
+    if (response?.type === "error") {
+      throw new Error(response.message ?? "Unable to close task");
+    }
+
+    if (response && response.type !== "ack") {
+      throw new Error("Unexpected response from background script");
+    }
+
+    await loadHistory();
+  } catch (error) {
+    console.error("Failed to close task", error);
+    errorOutput.textContent = `Unable to remove task: ${error.message}`;
+    button.disabled = false;
+  }
+}
+
 function renderHistory(history) {
   historyList.innerHTML = "";
   const tasks = Array.isArray(history) ? history : [];
@@ -319,6 +349,21 @@ function renderHistory(history) {
       title.rel = "noopener noreferrer";
     }
     header.append(title);
+
+    let closeButton = null;
+    if (task?.id) {
+      closeButton = document.createElement("button");
+      closeButton.type = "button";
+      closeButton.className = "task-close";
+      closeButton.textContent = "✕";
+      closeButton.title = "Remove from history";
+      closeButton.setAttribute("aria-label", "Remove task from history");
+      closeButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        handleCloseTask(closeButton, task.id);
+      });
+    }
 
     const meta = document.createElement("div");
     meta.className = "task-meta";
@@ -374,6 +419,10 @@ function renderHistory(history) {
       statusContainer.append(statusLabel, status);
 
       header.append(statusContainer);
+    }
+
+    if (closeButton) {
+      header.append(closeButton);
     }
     content.append(header);
 
