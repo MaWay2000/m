@@ -189,6 +189,8 @@ async function appendHistory(task) {
   console.log("Tracked codex task", entry);
 }
 
+const COMPLETED_STATUS_KEYS = new Set(["ready", "pr-created", "merged"]);
+
 async function updateHistory(task) {
   const id = normalizeTaskId(task?.id);
   if (!id) {
@@ -202,6 +204,12 @@ async function updateHistory(task) {
   const index = history.findIndex((entry) => normalizeTaskId(entry?.id) === id);
 
   if (index === -1) {
+    const statusKey = String(task?.status ?? "")
+      .trim()
+      .toLowerCase();
+    if (statusKey && COMPLETED_STATUS_KEYS.has(statusKey)) {
+      return;
+    }
     const sanitizedName = sanitizeTaskName(task?.name);
     const entry = {
       id,
@@ -472,3 +480,20 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   return false;
 });
+
+if (typeof module !== "undefined" && module?.exports) {
+  module.exports = {
+    appendHistory,
+    updateHistory,
+    getHistory,
+    markTaskClosed,
+    normalizeTaskId,
+    sanitizeTaskName,
+    resolveTaskName,
+    storageGet,
+    storageSet,
+    HISTORY_KEY,
+    CLOSED_TASKS_KEY,
+    COMPLETED_STATUS_KEYS,
+  };
+}
