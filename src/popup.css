@@ -140,6 +140,14 @@ button:disabled {
   gap: 0.4rem;
 }
 
+.task-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .task-meta {
   display: flex;
   flex-wrap: wrap;
