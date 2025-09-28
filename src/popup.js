@@ -7,6 +7,77 @@ const countBadge = document.getElementById("history-count");
 const autoCreatePrTasks = new Set();
 let autoCreatePrQueue = Promise.resolve();
 const pendingSmartChecks = new Set();
+const lastKnownTaskStatuses = new Map();
+
+let hasRenderedHistory = false;
+let audioContext;
+let userHasInteracted = false;
+
+function ensureAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return null;
+  }
+  if (!audioContext || audioContext.state === "closed") {
+    try {
+      audioContext = new AudioContextClass();
+    } catch (error) {
+      console.error("Failed to create audio context", error);
+      audioContext = null;
+      return null;
+    }
+  }
+  if (audioContext?.state === "suspended" && userHasInteracted) {
+    audioContext.resume().catch((error) => {
+      console.error("Failed to resume audio context", error);
+    });
+  }
+  return audioContext ?? null;
+}
+
+function playNotificationSound(kind = "default") {
+  const context = ensureAudioContext();
+  if (!context) {
+    return;
+  }
+
+  const now = context.currentTime;
+
+  const pattern =
+    kind === "completion"
+      ? [
+          { offset: 0, frequency: 880 },
+          { offset: 0.28, frequency: 1040 },
+        ]
+      : [{ offset: 0, frequency: 720 }];
+
+  for (const tone of pattern) {
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(tone.frequency, now + tone.offset);
+
+    gainNode.gain.setValueAtTime(0.0001, now + tone.offset);
+    gainNode.gain.exponentialRampToValueAtTime(0.18, now + tone.offset + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + tone.offset + 0.32);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+
+    oscillator.start(now + tone.offset);
+    oscillator.stop(now + tone.offset + 0.36);
+  }
+}
+
+window.addEventListener(
+  "pointerdown",
+  () => {
+    userHasInteracted = true;
+    ensureAudioContext();
+  },
+  { once: true, capture: true },
+);
 
 const MAX_AUTO_CREATE_PR_AGE_MS = 5 * 60 * 1000;
 
@@ -94,9 +165,12 @@ function openTaskInNewTab(url) {
   return Promise.resolve();
 }
 
-async function handleCreatePr(button, task) {
+async function handleCreatePr(button, task, options = {}) {
   if (!task?.id) {
     return false;
+  }
+  if (!options?.silent) {
+    playNotificationSound("action");
   }
   errorOutput.textContent = "";
   button.disabled = true;
@@ -156,7 +230,7 @@ function queueAutoCreatePr(button, task) {
       console.error("Auto-create PR chain error", error);
     })
     .then(async () => {
-      const success = await handleCreatePr(button, task);
+      const success = await handleCreatePr(button, task, { silent: true });
       if (!success) {
         autoCreatePrTasks.delete(task.id);
       }
@@ -211,10 +285,14 @@ async function handleSmartCheck(button, task) {
 function renderHistory(history) {
   historyList.innerHTML = "";
   const tasks = Array.isArray(history) ? history : [];
+  const nextStatuses = new Map();
+  let shouldPlayCompletionSound = false;
 
   if (!tasks.length) {
     emptyState.hidden = false;
     countBadge.hidden = true;
+    lastKnownTaskStatuses.clear();
+    hasRenderedHistory = true;
     return;
   }
 
@@ -262,6 +340,18 @@ function renderHistory(history) {
 
     const statusValueRaw = task?.status ? String(task.status) : "working";
     const statusKey = statusValueRaw.toLowerCase();
+
+    if (task?.id) {
+      nextStatuses.set(task.id, statusKey);
+      const previousStatus = lastKnownTaskStatuses.get(task.id);
+      if (hasRenderedHistory && statusKey === "ready") {
+        if (previousStatus && previousStatus !== "ready") {
+          shouldPlayCompletionSound = true;
+        } else if (previousStatus === undefined) {
+          shouldPlayCompletionSound = true;
+        }
+      }
+    }
 
     const shouldDisplayStatus =
       statusKey !== "working" && statusKey !== "working on your task";
@@ -350,6 +440,17 @@ function renderHistory(history) {
 
     historyList.append(item);
   }
+
+  lastKnownTaskStatuses.clear();
+  for (const [id, status] of nextStatuses) {
+    lastKnownTaskStatuses.set(id, status);
+  }
+
+  if (shouldPlayCompletionSound) {
+    playNotificationSound("completion");
+  }
+
+  hasRenderedHistory = true;
 }
 
 async function loadHistory() {
