@@ -107,10 +107,11 @@ button:disabled {
   overflow-y: auto;
 }
 
+
 .history-item {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding: 0.5rem;
   border-radius: 0.5rem;
   border: 1px solid #e2e8f0;
@@ -130,6 +131,13 @@ button:disabled {
 
 .task-name:hover {
   text-decoration: underline;
+}
+
+.task-content {
+  flex: 1 1 60%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .task-meta {
@@ -158,8 +166,41 @@ button:disabled {
   background: #dcfce7;
   color: #166534;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.task-status--ready {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.task-status--pr-created {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.task-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.task-action {
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
+}
+
+.task-action.view-task {
+  border-color: #94a3b8;
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
+.task-action.view-task:hover:not(:disabled) {
+  background: #cbd5f5;
+  border-color: #94a3b8;
 }
 
 #error {

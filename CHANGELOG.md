@@ -1,5 +1,10 @@
 # Changelog
 
+# 1.1.1 - 2025-09-28
+- Added popup actions to open ready tasks, trigger the "Create PR" workflow, and mark the status as PR created.
+- Introduced new styling for task actions and status badges.
+- Granted the extension permission to open task links in new tabs.
+
 # 1.1.0 - 2025-09-28
 - Added a Codex page content watcher that scans every three seconds for the "working" status indicator square and reports detected tasks to the background script.
 - Persist detected task history in extension storage and expose it through the popup UI.

@@ -11,6 +11,10 @@ This repository contains the codex-autorun Firefox-compatible WebExtension with 
 - `src/popup.js` – popup script that renders the tracked history and lets the user refresh it on demand
 - `src/popup.css` – styles used by the popup
 
+## Popup workflow
+
+When a tracked task leaves the "working" state, the popup now highlights it as **Ready** and provides a **Create PR** action. Clicking the button opens the original task link in a new tab and marks the stored status as **PR created** so you can track which tasks already have pull requests in flight. All other tasks expose an **Open task** action for quick access to their Codex links.
+
 ## Load the extension in Firefox
 
 1. Clone this repository and ensure all files are available locally.
