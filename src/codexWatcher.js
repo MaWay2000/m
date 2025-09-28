@@ -6,6 +6,8 @@ const runtime =
 const trackedTasks = new Map();
 const MIN_SQUARE_SIZE = 6;
 const MAX_SQUARE_SIZE = 24;
+const AUTO_CLICK_MAX_ATTEMPTS = 120;
+const AUTO_CLICK_INTERVAL_MS = 500;
 
 function isTransparentColor(color) {
   if (!color || color === "transparent") {
@@ -199,8 +201,220 @@ function scanForTasks() {
   }
 }
 
+function elementTextMatches(element, text) {
+  if (!element || !text) {
+    return false;
+  }
+  const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  const ariaLabel = element.getAttribute("aria-label");
+  if (ariaLabel && ariaLabel.replace(/\s+/g, " ").trim().toLowerCase().includes(normalized)) {
+    return true;
+  }
+  const title = element.getAttribute("title");
+  if (title && title.replace(/\s+/g, " ").trim().toLowerCase().includes(normalized)) {
+    return true;
+  }
+  const textContent = element.textContent;
+  if (textContent && textContent.replace(/\s+/g, " ").trim().toLowerCase().includes(normalized)) {
+    return true;
+  }
+  return false;
+}
+
+function isElementDisabled(element) {
+  if (!element) {
+    return true;
+  }
+  if (element.matches?.("button, [role='button']")) {
+    if (element.disabled) {
+      return true;
+    }
+    const ariaDisabled = element.getAttribute("aria-disabled");
+    if (ariaDisabled && ariaDisabled.toLowerCase() === "true") {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isElementVisible(element) {
+  if (!element) {
+    return false;
+  }
+  if (!(element instanceof Element)) {
+    return false;
+  }
+  if (element instanceof HTMLElement && element.hidden) {
+    return false;
+  }
+  if (element.closest?.('[aria-hidden="true"]')) {
+    return false;
+  }
+  const style = window.getComputedStyle?.(element);
+  if (style) {
+    if (style.display === "none" || style.visibility === "hidden") {
+      return false;
+    }
+    const opacity = parseFloat(style.opacity ?? "1");
+    if (Number.isFinite(opacity) && opacity === 0) {
+      return false;
+    }
+  }
+  const rect = element.getBoundingClientRect?.();
+  if (!rect) {
+    return true;
+  }
+  return rect.width > 0 && rect.height > 0;
+}
+
+function findCreatePrButtonInRoot(root) {
+  if (!root?.querySelectorAll) {
+    return null;
+  }
+
+  const explicitSelectors = [
+    "[data-testid*='create-pr' i]",
+    "[id*='create-pr' i]",
+    "button.create-pr",
+    "button[data-variant*='create-pr' i]",
+  ];
+
+  for (const selector of explicitSelectors) {
+    const candidate = root.querySelector(selector);
+    if (candidate && isElementVisible(candidate)) {
+      return candidate;
+    }
+  }
+
+  const candidates = root.querySelectorAll("button, a, [role='button']");
+  for (const candidate of candidates) {
+    if (isElementVisible(candidate) && elementTextMatches(candidate, "create pr")) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function findCreatePrButton() {
+  const visitedRoots = new Set();
+
+  const initial = findCreatePrButtonInRoot(document);
+  if (initial) {
+    return initial;
+  }
+  visitedRoots.add(document);
+
+  const queue = [document];
+
+  while (queue.length) {
+    const root = queue.shift();
+    if (!root?.querySelectorAll) {
+      continue;
+    }
+    const elements = root.querySelectorAll("*");
+    for (const element of elements) {
+      const shadowRoot = element?.shadowRoot;
+      if (shadowRoot && !visitedRoots.has(shadowRoot)) {
+        visitedRoots.add(shadowRoot);
+        const match = findCreatePrButtonInRoot(shadowRoot);
+        if (match) {
+          return match;
+        }
+        queue.push(shadowRoot);
+      }
+    }
+  }
+
+  return null;
+}
+
+function setupCreatePrAutoClick() {
+  if (window.__codexCreatePrAutoclickInitialized) {
+    return;
+  }
+  window.__codexCreatePrAutoclickInitialized = true;
+
+  let attempts = 0;
+  let clicked = false;
+  let intervalId = null;
+
+  const cleanup = () => {
+    if (observer) {
+      observer.disconnect();
+    }
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+  };
+
+  const attemptClick = () => {
+    if (clicked) {
+      return;
+    }
+    attempts += 1;
+    const button = findCreatePrButton();
+    if (!button) {
+      if (attempts >= AUTO_CLICK_MAX_ATTEMPTS) {
+        cleanup();
+      }
+      return;
+    }
+
+    if (isElementDisabled(button)) {
+      if (attempts >= AUTO_CLICK_MAX_ATTEMPTS) {
+        cleanup();
+      }
+      return;
+    }
+
+    try {
+      button.click();
+      console.log("codex-autorun: auto-clicked Create PR button.");
+      clicked = true;
+      cleanup();
+    } catch (error) {
+      console.warn("codex-autorun: failed to auto-click Create PR", error);
+      if (attempts >= AUTO_CLICK_MAX_ATTEMPTS) {
+        cleanup();
+      }
+    }
+  };
+
+  const observer = new MutationObserver(() => {
+    attemptClick();
+  });
+
+  intervalId = window.setInterval(() => {
+    attemptClick();
+    if (attempts >= AUTO_CLICK_MAX_ATTEMPTS) {
+      cleanup();
+    }
+  }, AUTO_CLICK_INTERVAL_MS);
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", attemptClick, {
+      once: true,
+    });
+  }
+
+  if (document.documentElement) {
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  attemptClick();
+}
+
 if (!window.__codexSquareWatcherInitialized) {
   window.__codexSquareWatcherInitialized = true;
   scanForTasks();
   setInterval(scanForTasks, 3000);
 }
+
+setupCreatePrAutoClick();
