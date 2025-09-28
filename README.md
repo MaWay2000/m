@@ -20,3 +20,12 @@ This repository contains a minimal Firefox-compatible WebExtension with a backgr
 6. A new toolbar button labelled **Sample Extension** appears. Click it to open the popup and test the ping/pong interaction.
 
 The extension remains installed until you restart Firefox. Repeat the steps above to load it again after restarting the browser.
+
+## Project update rules
+
+To keep the project history consistent:
+
+1. Document every change in `CHANGELOG.md` with a brief description of what was updated.
+2. Update the `version` field in `manifest.json` whenever the project changes.
+   - For routine or small adjustments, increment the patch number (`x.x.+1`).
+   - For new functions or other major additions, increment the minor number (`x.+1.x`).

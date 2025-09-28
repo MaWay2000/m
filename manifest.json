@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Sample WebExtension",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A starter WebExtension with background script and popup.",
   "browser_action": {
     "default_title": "Sample Extension",
