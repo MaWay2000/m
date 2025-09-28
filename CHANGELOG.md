@@ -1,5 +1,11 @@
 # Changelog
 
+# 1.1.6 - 2025-09-28
+- Replaced the PNG toolbar icons with equivalent SVG assets so the repository no longer depends on binary files.
+
+# 1.1.5 - 2025-09-28
+- Added Firefox toolbar icon assets and wired them up in the manifest so the button renders again.
+
 # 1.1.4 - 2025-09-28
 - Restore automatic handling of ready Codex tasks by opening them in a new tab and marking them as PR created without opening the popup.
 
