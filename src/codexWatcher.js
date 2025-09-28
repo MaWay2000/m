@@ -85,17 +85,183 @@ function extractTaskId(href) {
   }
 }
 
-function extractTaskName(container, link) {
-  const candidate =
-    container?.querySelector("h1, h2, h3, h4, [data-testid*='title' i], strong") ?? link;
-  if (candidate?.textContent) {
-    const text = candidate.textContent.replace(/\s+/g, " ").trim();
+const IGNORED_TEXT_PATTERNS = [
+  /\bworking on your task\b/i,
+  /\bjust now\b/i,
+  /\b(?:seconds?|minutes?|hours?|days?)\s+ago\b/i,
+];
+
+const IGNORED_TEXT_SYMBOLS = ["·", "|", "•"];
+
+const PREFERRED_TASK_TEXT_SELECTORS = [
+  "[data-testid*='task-text' i]",
+  "[data-testid*='task-summary' i]",
+  "[data-testid*='task-title' i]",
+  "[data-testid*='task-name' i]",
+  "[data-testid*='prompt' i]",
+  "article p",
+  "p[data-testid]",
+];
+
+function normalizeTextContent(value) {
+  if (!value) {
+    return "";
+  }
+  return String(value)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isMeaningfulTaskText(text) {
+  const normalized = normalizeTextContent(text);
+  if (!normalized) {
+    return false;
+  }
+  if (normalized.length < 6) {
+    return false;
+  }
+  const lower = normalized.toLowerCase();
+  if (IGNORED_TEXT_PATTERNS.some((pattern) => pattern.test(lower))) {
+    return false;
+  }
+  if (IGNORED_TEXT_SYMBOLS.some((symbol) => normalized.includes(symbol))) {
+    const sanitized = normalized.replace(/[·|•]/g, " ").replace(/\s+/g, " ").trim();
+    if (!sanitized || sanitized.split(" ").length < 3) {
+      return false;
+    }
+  }
+  const wordCount = normalized.split(/\s+/).length;
+  if (wordCount < 3 && normalized.length < 20) {
+    return false;
+  }
+  return true;
+}
+
+const IGNORED_TAGS_FOR_TASK_TEXT = new Set([
+  "SCRIPT",
+  "STYLE",
+  "NOSCRIPT",
+  "CODE",
+  "PRE",
+  "SVG",
+  "BUTTON",
+  "AUDIO",
+  "VIDEO",
+]);
+
+function collectTaskTextCandidates(root, results = []) {
+  if (!root) {
+    return results;
+  }
+
+  if (root.nodeType === Node.TEXT_NODE) {
+    const text = normalizeTextContent(root.textContent);
     if (text) {
+      results.push({ text, element: root.parentElement });
+    }
+    return results;
+  }
+
+  if (root.nodeType !== Node.ELEMENT_NODE) {
+    return results;
+  }
+
+  const element = root;
+  if (IGNORED_TAGS_FOR_TASK_TEXT.has(element.tagName)) {
+    return results;
+  }
+
+  for (const child of element.childNodes) {
+    collectTaskTextCandidates(child, results);
+  }
+
+  return results;
+}
+
+function scoreTaskText(text, element) {
+  let score = text.length;
+  const wordCount = text.split(/\s+/).length;
+  score += wordCount * 2;
+
+  if (/[.?!]$/.test(text)) {
+    score += 5;
+  }
+
+  if (/^[A-Z0-9\s.,!?'-]+$/.test(text) && /[A-Z]/.test(text) && !/[a-z]/.test(text)) {
+    score -= 10;
+  }
+
+  if (/\bworking on your task\b/i.test(text)) {
+    score -= 100;
+  }
+
+  if (/\bjust now\b/i.test(text)) {
+    score -= 60;
+  }
+
+  if (text.includes("·") || text.includes("•") || text.includes("|")) {
+    score -= 15;
+  }
+
+  const tagName = element?.tagName ?? "";
+  if (tagName === "P" || tagName === "DIV") {
+    score += 8;
+  } else if (tagName && tagName.startsWith("H")) {
+    score += 4;
+  }
+
+  if (element?.closest?.("[data-testid*='task-text' i]")) {
+    score += 10;
+  }
+
+  return score;
+}
+
+function extractTaskName(container, link) {
+  if (!container) {
+    const fallback = link?.textContent;
+    return fallback ? normalizeTextContent(fallback) : null;
+  }
+
+  for (const selector of PREFERRED_TASK_TEXT_SELECTORS) {
+    const preferred = container.querySelector(selector);
+    const text = normalizeTextContent(preferred?.textContent);
+    if (isMeaningfulTaskText(text)) {
       return text;
     }
   }
-  const fallback = link?.textContent ?? container?.textContent;
-  return fallback ? fallback.replace(/\s+/g, " ").trim() : null;
+
+  const textCandidates = collectTaskTextCandidates(container);
+  let bestCandidate = null;
+  let bestScore = -Infinity;
+  const seen = new Set();
+
+  for (const candidate of textCandidates) {
+    if (!isMeaningfulTaskText(candidate.text)) {
+      continue;
+    }
+    if (seen.has(candidate.text)) {
+      continue;
+    }
+    seen.add(candidate.text);
+    const score = scoreTaskText(candidate.text, candidate.element);
+    if (score > bestScore) {
+      bestScore = score;
+      bestCandidate = candidate.text;
+    }
+  }
+
+  if (bestCandidate) {
+    return bestCandidate;
+  }
+
+  const fallbackCandidate =
+    container.querySelector("h1, h2, h3, h4, [data-testid*='title' i], [role='heading'], strong") ??
+    link;
+  const fallbackText = normalizeTextContent(
+    fallbackCandidate?.textContent ?? link?.textContent ?? container?.textContent,
+  );
+  return fallbackText || null;
 }
 
 function extractTaskUrl(link) {
