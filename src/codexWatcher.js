@@ -195,6 +195,7 @@ function extractTaskId(href) {
 const IGNORED_TEXT_PATTERNS = [
   /\bworking on your task\b/i,
   /\bjust now\b/i,
+  /\bcommitting changes?\b/i,
   /\b(?:seconds?|minutes?|hours?|days?)\s+ago\b/i,
 ];
 
@@ -257,6 +258,9 @@ function shouldScheduleNameRefresh(name, taskId) {
     return true;
   }
   if (/\bworking on your task\b/i.test(lower)) {
+    return true;
+  }
+  if (/\bcommitting changes?\b/i.test(lower)) {
     return true;
   }
   if (/\bjust now\b/i.test(lower)) {
