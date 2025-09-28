@@ -33,6 +33,106 @@ function isTransparentColor(color) {
   return false;
 }
 
+function parseCssColor(color) {
+  if (!color || typeof color !== "string") {
+    return null;
+  }
+
+  const trimmed = color.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed === "transparent") {
+    return { r: 0, g: 0, b: 0, a: 0 };
+  }
+
+  if (trimmed.startsWith("#")) {
+    const hex = trimmed.slice(1);
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+        return null;
+      }
+      return { r, g, b, a: 1 };
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+        return null;
+      }
+      return { r, g, b, a: 1 };
+    }
+    return null;
+  }
+
+  const rgbMatch = trimmed.match(/^rgba?\(([^)]+)\)$/);
+  if (!rgbMatch) {
+    return null;
+  }
+
+  const parts = rgbMatch[1]
+    .split(/[\s,\/]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (parts.length < 3) {
+    return null;
+  }
+
+  const parseChannel = (value) => {
+    if (value.endsWith("%")) {
+      const percent = parseFloat(value.slice(0, -1));
+      if (!Number.isFinite(percent)) {
+        return null;
+      }
+      return Math.max(0, Math.min(100, percent)) * 2.55;
+    }
+    const number = parseFloat(value);
+    if (!Number.isFinite(number)) {
+      return null;
+    }
+    return Math.max(0, Math.min(255, number));
+  };
+
+  const r = parseChannel(parts[0]);
+  const g = parseChannel(parts[1]);
+  const b = parseChannel(parts[2]);
+
+  if (r == null || g == null || b == null) {
+    return null;
+  }
+
+  let a = 1;
+  if (parts.length >= 4) {
+    const alpha = parseFloat(parts[3]);
+    if (Number.isFinite(alpha)) {
+      a = Math.max(0, Math.min(1, alpha));
+    }
+  }
+
+  return { r, g, b, a };
+}
+
+function isDarkColor(color) {
+  const parsed = parseCssColor(color);
+  if (!parsed || parsed.a === 0) {
+    return false;
+  }
+
+  const { r, g, b } = parsed;
+  if (![r, g, b].every((channel) => Number.isFinite(channel))) {
+    return false;
+  }
+
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance < 110;
+}
+
 function isSquareIndicator(element) {
   if (!element || typeof element.getBoundingClientRect !== "function") {
     return false;
@@ -55,7 +155,9 @@ function isSquareIndicator(element) {
   const hasBackground = style && !isTransparentColor(style.backgroundColor);
   const borderWidth = parseFloat(style?.borderWidth ?? "0");
   const hasBorder = Number.isFinite(borderWidth) && borderWidth > 0.2 && !isTransparentColor(style?.borderColor ?? "transparent");
-  return hasBackground || hasBorder;
+  const hasDarkBackground = hasBackground && isDarkColor(style.backgroundColor);
+  const hasDarkBorder = hasBorder && isDarkColor(style.borderColor);
+  return hasDarkBackground || hasDarkBorder;
 }
 
 function findIndicatorElement(container) {
