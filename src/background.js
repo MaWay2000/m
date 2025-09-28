@@ -272,24 +272,29 @@ async function getHistory() {
 
   for (const entry of history) {
     if (!entry || typeof entry !== "object") {
-      normalizedHistory.push(entry);
+      requiresUpdate = true;
       continue;
     }
 
     let nextEntry = entry;
     const normalizedId = normalizeTaskId(entry.id);
 
-    if (normalizedId && normalizedId !== entry.id) {
-      nextEntry = { ...nextEntry, id: normalizedId };
-      requiresUpdate = true;
-    }
-
-    if (normalizedId && closedSet.has(normalizedId)) {
+    if (!normalizedId) {
       requiresUpdate = true;
       continue;
     }
 
-    const resolvedName = resolveTaskName(nextEntry.name, normalizedId || nextEntry.id);
+    if (closedSet.has(normalizedId)) {
+      requiresUpdate = true;
+      continue;
+    }
+
+    if (normalizedId !== entry.id) {
+      nextEntry = { ...nextEntry, id: normalizedId };
+      requiresUpdate = true;
+    }
+
+    const resolvedName = resolveTaskName(nextEntry.name, normalizedId);
     if (resolvedName !== nextEntry.name) {
       nextEntry = { ...nextEntry, name: resolvedName };
       requiresUpdate = true;
@@ -298,7 +303,7 @@ async function getHistory() {
     normalizedHistory.push(nextEntry);
   }
 
-  if (requiresUpdate) {
+  if (requiresUpdate || normalizedHistory.length !== history.length) {
     await storageSet(HISTORY_KEY, normalizedHistory);
   }
 
