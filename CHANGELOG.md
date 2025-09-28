@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.10 - 2025-09-28
+- Inject the Codex watcher on debuggpt.tools so new tasks appear in the history again.
+
 # 1.1.9 - 2025-09-28
 - Refresh task names while Codex is still working so the popup stays aligned with the UI.
 
