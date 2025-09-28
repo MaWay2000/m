@@ -166,6 +166,9 @@ function renderHistory(history) {
     const content = document.createElement("div");
     content.className = "task-content";
 
+    const header = document.createElement("div");
+    header.className = "task-header";
+
     const title = document.createElement(task?.url ? "a" : "span");
     title.className = "task-name";
     title.textContent = task?.name ?? task?.id ?? "Unknown task";
@@ -174,7 +177,7 @@ function renderHistory(history) {
       title.target = "_blank";
       title.rel = "noopener noreferrer";
     }
-    content.append(title);
+    header.append(title);
 
     const meta = document.createElement("div");
     meta.className = "task-meta";
@@ -213,7 +216,10 @@ function renderHistory(history) {
 
     statusContainer.append(statusLabel, status);
 
-    meta.append(idBadge, startedTime, statusContainer);
+    header.append(statusContainer);
+    content.append(header);
+
+    meta.append(idBadge, startedTime);
     content.append(meta);
     item.append(content);
 
