@@ -5,7 +5,8 @@
   "description": "The codex-autorun WebExtension with background script and popup.",
   "browser_action": {
     "default_title": "codex-autorun",
-    "default_popup": "src/popup.html"
+    "default_popup": "src/popup.html",
+    "default_area": "navbar"
   },
   "background": {
     "scripts": ["src/background.js"],
