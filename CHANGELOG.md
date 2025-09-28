@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.2 - 2025-09-28
+- Automated the **Create PR** action for ready tasks and update their status to **PR created** when successful.
+
 # 1.1.1 - 2025-09-28
 - Added popup actions to open ready tasks, trigger the "Create PR" workflow, and mark the status as PR created.
 - Introduced new styling for task actions and status badges.
