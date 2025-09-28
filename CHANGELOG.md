@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.7 - 2025-09-28
+- Added explicit 19 px/38 px SVG toolbar icons in the manifest so the browser menu button renders without requiring binary assets.
+
 # 1.1.6 - 2025-09-28
 - Replaced the PNG toolbar icons with equivalent SVG assets so the repository no longer depends on binary files.
 
