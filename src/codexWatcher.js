@@ -119,7 +119,7 @@ function rememberTaskName(taskId, name) {
   if (!taskId || !name) {
     return;
   }
-  const normalizedName = normalizeTextContent(name);
+  const normalizedName = normalizeTaskText(name);
   if (!normalizedName) {
     return;
   }
@@ -146,8 +146,52 @@ function normalizeTextContent(value) {
     .trim();
 }
 
+function normalizeTaskText(value) {
+  const normalized = normalizeTextContent(value);
+  if (!normalized) {
+    return "";
+  }
+
+  const removeIgnoredText = (input) => {
+    let result = input;
+    for (const pattern of IGNORED_TEXT_PATTERNS) {
+      result = result.replace(pattern, " ");
+    }
+    return result.replace(/\s+/g, " ").trim();
+  };
+
+  const segments = normalized
+    .split(/[·•|]+/g)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  if (!segments.length) {
+    return removeIgnoredText(normalized);
+  }
+
+  const cleanedSegments = [];
+
+  for (const segment of segments) {
+    const cleaned = removeIgnoredText(segment);
+    if (!cleaned) {
+      continue;
+    }
+    const lower = cleaned.toLowerCase();
+    if (IGNORED_TEXT_PATTERNS.some((pattern) => pattern.test(lower))) {
+      continue;
+    }
+    cleanedSegments.push(cleaned);
+  }
+
+  if (!cleanedSegments.length) {
+    return removeIgnoredText(normalized);
+  }
+
+  return cleanedSegments.join(" · ");
+}
+
 function isMeaningfulTaskText(text) {
-  const normalized = normalizeTextContent(text);
+  const normalized = normalizeTaskText(text);
   if (!normalized) {
     return false;
   }
@@ -189,7 +233,7 @@ function collectTaskTextCandidates(root, results = []) {
   }
 
   if (root.nodeType === Node.TEXT_NODE) {
-    const text = normalizeTextContent(root.textContent);
+    const text = normalizeTaskText(root.textContent);
     if (text) {
       results.push({ text, element: root.parentElement });
     }
@@ -253,13 +297,13 @@ function scoreTaskText(text, element) {
 
 function extractTaskName(container, link) {
   if (!container) {
-    const fallback = link?.textContent;
-    return fallback ? normalizeTextContent(fallback) : null;
+    const fallback = normalizeTaskText(link?.textContent);
+    return fallback || null;
   }
 
   for (const selector of PREFERRED_TASK_TEXT_SELECTORS) {
     const preferred = container.querySelector(selector);
-    const text = normalizeTextContent(preferred?.textContent);
+    const text = normalizeTaskText(preferred?.textContent);
     if (isMeaningfulTaskText(text)) {
       return text;
     }
@@ -292,7 +336,7 @@ function extractTaskName(container, link) {
   const fallbackCandidate =
     container.querySelector("h1, h2, h3, h4, [data-testid*='title' i], [role='heading'], strong") ??
     link;
-  const fallbackText = normalizeTextContent(
+  const fallbackText = normalizeTaskText(
     fallbackCandidate?.textContent ?? link?.textContent ?? container?.textContent,
   );
   return fallbackText || null;
@@ -400,7 +444,7 @@ function updateCurrentTaskNameFromConversation() {
     return;
   }
 
-  const normalizedName = normalizeTextContent(conversationName);
+  const normalizedName = normalizeTaskText(conversationName);
   if (!normalizedName) {
     return;
   }
