@@ -7,6 +7,7 @@ const countBadge = document.getElementById("history-count");
 const autoCreatePrTasks = new Set();
 let autoCreatePrQueue = Promise.resolve();
 const lastKnownTaskStatuses = new Map();
+const COMPLETED_STATUS_KEYS = new Set(["ready", "merged"]);
 
 let hasRenderedHistory = false;
 let audioContext;
@@ -338,17 +339,21 @@ function renderHistory(history) {
     startedTime.textContent = formatTimestamp(task?.startedAt);
 
     const statusValueRaw = task?.status ? String(task.status) : "working";
-    const statusKey = statusValueRaw.toLowerCase();
+    const statusKey = statusValueRaw.trim().toLowerCase();
 
     if (task?.id) {
       nextStatuses.set(task.id, statusKey);
       const previousStatus = lastKnownTaskStatuses.get(task.id);
-      if (hasRenderedHistory && statusKey === "ready") {
-        if (previousStatus && previousStatus !== "ready") {
-          shouldPlayCompletionSound = true;
-        } else if (previousStatus === undefined) {
-          shouldPlayCompletionSound = true;
-        }
+      const wasPreviouslyCompleted =
+        previousStatus !== undefined &&
+        COMPLETED_STATUS_KEYS.has(previousStatus);
+
+      if (
+        hasRenderedHistory &&
+        COMPLETED_STATUS_KEYS.has(statusKey) &&
+        !wasPreviouslyCompleted
+      ) {
+        shouldPlayCompletionSound = true;
       }
     }
 
