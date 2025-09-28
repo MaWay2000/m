@@ -176,6 +176,7 @@ button:disabled {
   font-weight: 600;
   text-transform: none;
   letter-spacing: normal;
+  white-space: nowrap;
 }
 
 .task-status-container {
@@ -194,9 +195,41 @@ button:disabled {
   color: #92400e;
 }
 
+.task-status--working,
+.task-status--working-on-your-task {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .task-status--pr-created {
   background: #e0e7ff;
   color: #4338ca;
+}
+
+.task-status--pending,
+.task-status--queued {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.task-status--completed,
+.task-status--done,
+.task-status--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.task-status--failed,
+.task-status--error,
+.task-status--cancelled,
+.task-status--canceled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.task-status--unknown {
+  background: #e2e8f0;
+  color: #475569;
 }
 
 .task-actions {
