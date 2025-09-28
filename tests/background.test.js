@@ -44,7 +44,13 @@ global.console = console;
 const backgroundModule = await import("../src/background.js");
 const background = backgroundModule.default ?? backgroundModule;
 
-const { updateHistory, HISTORY_KEY, CLOSED_TASKS_KEY } = background;
+const {
+  updateHistory,
+  HISTORY_KEY,
+  CLOSED_TASKS_KEY,
+  sanitizeTaskName,
+  resolveTaskName,
+} = background;
 
 test("ready status update for unknown task does not create history entry", async () => {
   store[HISTORY_KEY] = [
@@ -70,5 +76,31 @@ test("ready status update for unknown task does not create history entry", async
       { id: "3", name: "Task 3", status: "working" },
     ],
     "Existing history should remain unchanged",
+  );
+});
+
+test("sanitizeTaskName preserves file path task names", () => {
+  assert.strictEqual(
+    sanitizeTaskName("tests/example-file.php"),
+    "tests/example-file.php",
+    "File-like task names should remain intact",
+  );
+  assert.strictEqual(
+    resolveTaskName("tests/example-file.php", "123"),
+    "tests/example-file.php",
+    "Resolved task name should not fall back to the task id when a file path is provided",
+  );
+});
+
+test("sanitizeTaskName still strips bare repository slugs", () => {
+  assert.strictEqual(
+    sanitizeTaskName("openai/sample"),
+    "",
+    "Repository slugs should be stripped from task names",
+  );
+  assert.strictEqual(
+    resolveTaskName("openai/sample", "456"),
+    "Task 456",
+    "Repository-like task names should still resolve to the fallback",
   );
 });

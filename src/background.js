@@ -41,7 +41,11 @@ function sanitizeTaskName(value) {
   }
 
   if (/^[a-z0-9._-]+\/[a-z0-9._-]+$/i.test(result)) {
-    return "";
+    const [, secondSegment = ""] = result.split("/");
+    const looksLikeFilePath = /\./.test(secondSegment);
+    if (!looksLikeFilePath) {
+      return "";
+    }
   }
 
   return result;
