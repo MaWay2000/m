@@ -115,6 +115,13 @@ const CONVERSATION_TASK_SELECTORS = [
 const MAX_TRACKED_NAME_ENTRIES = 400;
 const MAX_TASK_NAME_LENGTH = 500;
 
+function looksLikeAbsoluteUrl(value) {
+  if (!value) {
+    return false;
+  }
+  return /^https?:\/\//i.test(String(value).trim());
+}
+
 function rememberTaskName(taskId, name) {
   if (!taskId || !name) {
     return;
@@ -256,6 +263,70 @@ function collectTaskTextCandidates(root, results = []) {
   return results;
 }
 
+function collectAccessibleText(element) {
+  const results = [];
+  if (!element) {
+    return results;
+  }
+
+  const seen = new Set();
+
+  const add = (value) => {
+    const normalized = normalizeTaskText(value);
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    results.push(normalized);
+  };
+
+  const ariaLabel = element.getAttribute?.("aria-label");
+  if (ariaLabel) {
+    add(ariaLabel);
+  }
+
+  const title = element.getAttribute?.("title");
+  if (title) {
+    add(title);
+  }
+
+  const ariaDescription = element.getAttribute?.("aria-description");
+  if (ariaDescription) {
+    add(ariaDescription);
+  }
+
+  const collectReferencedText = (attribute) => {
+    const references = element.getAttribute?.(attribute);
+    if (!references) {
+      return;
+    }
+    const ids = references.split(/\s+/).filter(Boolean);
+    if (!ids.length) {
+      return;
+    }
+    const doc = element.ownerDocument ?? document;
+    const parts = [];
+    for (const id of ids) {
+      const referenced = doc?.getElementById?.(id);
+      if (!referenced) {
+        continue;
+      }
+      const text = normalizeTaskText(referenced.textContent);
+      if (text) {
+        parts.push(text);
+      }
+    }
+    if (parts.length) {
+      add(parts.join(" "));
+    }
+  };
+
+  collectReferencedText("aria-labelledby");
+  collectReferencedText("aria-describedby");
+
+  return results;
+}
+
 function scoreTaskText(text, element) {
   let score = text.length;
   const wordCount = text.split(/\s+/).length;
@@ -297,14 +368,24 @@ function scoreTaskText(text, element) {
 
 function extractTaskName(container, link) {
   if (!container) {
+    const accessibleFromLink = collectAccessibleText(link);
+    for (const candidate of accessibleFromLink) {
+      if (isMeaningfulTaskText(candidate) && !looksLikeAbsoluteUrl(candidate)) {
+        return candidate;
+      }
+    }
+
     const fallback = normalizeTaskText(link?.textContent);
-    return fallback || null;
+    if (fallback && !looksLikeAbsoluteUrl(fallback)) {
+      return fallback;
+    }
+    return null;
   }
 
   for (const selector of PREFERRED_TASK_TEXT_SELECTORS) {
     const preferred = container.querySelector(selector);
     const text = normalizeTaskText(preferred?.textContent);
-    if (isMeaningfulTaskText(text)) {
+    if (isMeaningfulTaskText(text) && !looksLikeAbsoluteUrl(text)) {
       return text;
     }
   }
@@ -329,8 +410,19 @@ function extractTaskName(container, link) {
     }
   }
 
-  if (bestCandidate) {
+  if (bestCandidate && !looksLikeAbsoluteUrl(bestCandidate)) {
     return bestCandidate;
+  }
+
+  const accessibleCandidates = [
+    ...collectAccessibleText(container),
+    ...collectAccessibleText(link),
+  ];
+
+  for (const candidate of accessibleCandidates) {
+    if (isMeaningfulTaskText(candidate) && !looksLikeAbsoluteUrl(candidate)) {
+      return candidate;
+    }
   }
 
   const fallbackCandidate =
@@ -339,7 +431,11 @@ function extractTaskName(container, link) {
   const fallbackText = normalizeTaskText(
     fallbackCandidate?.textContent ?? link?.textContent ?? container?.textContent,
   );
-  return fallbackText || null;
+  if (fallbackText && !looksLikeAbsoluteUrl(fallbackText)) {
+    return fallbackText;
+  }
+
+  return null;
 }
 
 function extractConversationTaskName() {
