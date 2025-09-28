@@ -384,9 +384,15 @@ async function handleViewPROpen(){
   if(!taskId) return;
   if(taskId && !shared.taskId) shared.taskId=taskId;
   mountTimeline(shared,s);
+  const shouldRecordManualCreate=s.strictOrder&&!s.createEnabled&&!(shared.steps&&shared.steps.created);
+  if(shouldRecordManualCreate){
+    await setSharedFlow('created',{step:'created',taskId});
+    shared.flow='created';
+    shared.steps={...(shared.steps||{}),created:true};
+  }
   highlightTimeline(taskId,shared.flow);
   if(shared.steps&&shared.steps.viewed) return;
-  if(s.strictOrder && shared.flow!=='created') return;
+  if(s.strictOrder && s.createEnabled && shared.flow!=='created') return;
   const c=qsAll('a,button,summary').filter(el=>visible(el)&&TEXTS.VIEW.test((el.innerText||el.textContent||'').trim()));
   const link=c.find(el=>el.tagName==='A'&&el.href);
   const btn=c.find(el=>el.tagName!=='A');
