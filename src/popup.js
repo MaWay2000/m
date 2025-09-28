@@ -6,7 +6,6 @@ const countBadge = document.getElementById("history-count");
 
 const autoCreatePrTasks = new Set();
 let autoCreatePrQueue = Promise.resolve();
-const pendingSmartChecks = new Set();
 const lastKnownTaskStatuses = new Map();
 
 let hasRenderedHistory = false;
@@ -237,51 +236,6 @@ function queueAutoCreatePr(button, task) {
     });
 }
 
-async function handleSmartCheck(button, task) {
-  if (!task?.id || pendingSmartChecks.has(task.id)) {
-    return;
-  }
-
-  pendingSmartChecks.add(task.id);
-  errorOutput.textContent = "";
-  const originalText = button.textContent;
-  button.textContent = "Checking…";
-  button.disabled = true;
-
-  try {
-    const response = await sendMessage({
-      type: "smart-check-task",
-      task: {
-        id: task.id,
-        url: task.url ?? null,
-      },
-    });
-
-    if (response?.type === "smart-check-result") {
-      await loadHistory();
-      if (response.result?.status) {
-        errorOutput.textContent = `Smart check complete: task status is ${formatStatusLabel(
-          response.result.status,
-        )}.`;
-      }
-      return;
-    }
-
-    if (response?.type === "error") {
-      throw new Error(response.message ?? "Smart check failed");
-    }
-
-    throw new Error("Unexpected smart check response from background script.");
-  } catch (error) {
-    console.error("Failed to run smart check", error);
-    errorOutput.textContent = `Unable to verify task: ${error.message}`;
-  } finally {
-    button.disabled = false;
-    button.textContent = originalText;
-    pendingSmartChecks.delete(task.id);
-  }
-}
-
 async function handleCloseTask(button, taskId) {
   if (!taskId) {
     return;
@@ -467,19 +421,6 @@ function renderHistory(history) {
         });
       });
       actions.append(viewTaskButton);
-      hasActions = true;
-    }
-
-    const shouldOfferSmartCheck =
-      task?.url && statusKey !== "pr-created" && statusKey !== "ready";
-
-    if (shouldOfferSmartCheck) {
-      const smartCheckButton = document.createElement("button");
-      smartCheckButton.type = "button";
-      smartCheckButton.className = "task-action smart-check";
-      smartCheckButton.textContent = "Smart check";
-      smartCheckButton.addEventListener("click", () => handleSmartCheck(smartCheckButton, task));
-      actions.append(smartCheckButton);
       hasActions = true;
     }
 
