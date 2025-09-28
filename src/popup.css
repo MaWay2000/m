@@ -170,6 +170,17 @@ button:disabled {
   letter-spacing: normal;
 }
 
+.task-status-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.task-status-label {
+  font-weight: 500;
+  color: #334155;
+}
+
 .task-status--ready {
   background: #fef3c7;
   color: #92400e;
