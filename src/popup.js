@@ -4,6 +4,9 @@ const emptyState = document.getElementById("empty-state");
 const errorOutput = document.getElementById("error");
 const countBadge = document.getElementById("history-count");
 
+const autoCreatePrTasks = new Set();
+let autoCreatePrQueue = Promise.resolve();
+
 function sendMessage(message) {
   if (typeof browser !== "undefined" && browser?.runtime?.sendMessage) {
     return browser.runtime.sendMessage(message);
@@ -90,15 +93,16 @@ function openTaskInNewTab(url) {
 
 async function handleCreatePr(button, task) {
   if (!task?.id) {
-    return;
+    return false;
   }
   errorOutput.textContent = "";
   button.disabled = true;
+  let success = false;
   try {
     if (task?.url) {
       await openTaskInNewTab(task.url);
     }
-    await sendMessage({
+    const response = await sendMessage({
       type: "update-task-status",
       task: {
         id: task.id,
@@ -106,6 +110,13 @@ async function handleCreatePr(button, task) {
         completedAt: new Date().toISOString(),
       },
     });
+    if (response?.type === "error") {
+      throw new Error(response.message ?? "Unable to update task status");
+    }
+    if (response && response.type !== "ack") {
+      throw new Error("Unexpected response from background script");
+    }
+    success = true;
     await loadHistory();
   } catch (error) {
     console.error("Failed to create PR", error);
@@ -113,6 +124,25 @@ async function handleCreatePr(button, task) {
   } finally {
     button.disabled = false;
   }
+  return success;
+}
+
+function queueAutoCreatePr(button, task) {
+  if (!task?.id || autoCreatePrTasks.has(task.id)) {
+    return;
+  }
+
+  autoCreatePrTasks.add(task.id);
+  autoCreatePrQueue = autoCreatePrQueue
+    .catch((error) => {
+      console.error("Auto-create PR chain error", error);
+    })
+    .then(async () => {
+      const success = await handleCreatePr(button, task);
+      if (!success) {
+        autoCreatePrTasks.delete(task.id);
+      }
+    });
 }
 
 function renderHistory(history) {
@@ -189,6 +219,10 @@ function renderHistory(history) {
       createPrButton.addEventListener("click", () => handleCreatePr(createPrButton, task));
       actions.append(createPrButton);
       hasActions = true;
+
+      queueMicrotask(() => {
+        queueAutoCreatePr(createPrButton, task);
+      });
     }
 
     if (task?.url && statusKey !== "ready") {
