@@ -15,6 +15,45 @@ const autoProcessingTasks = new Set();
 
 const HISTORY_KEY = "codexTaskHistory";
 
+const IGNORED_NAME_PATTERNS = [
+  /working on your task/gi,
+  /just now/gi,
+];
+
+function sanitizeTaskName(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  let result = String(value).replace(/\s+/g, " ").trim();
+  if (!result) {
+    return "";
+  }
+
+  for (const pattern of IGNORED_NAME_PATTERNS) {
+    result = result.replace(pattern, " ");
+  }
+
+  result = result.replace(/[·•|]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!result) {
+    return "";
+  }
+
+  if (/^[a-z0-9._-]+\/[a-z0-9._-]+$/i.test(result)) {
+    return "";
+  }
+
+  return result;
+}
+
+function resolveTaskName(candidateName, taskId) {
+  const sanitized = sanitizeTaskName(candidateName);
+  if (sanitized) {
+    return sanitized;
+  }
+  return taskId ? `Task ${taskId}` : "Unknown task";
+}
+
 console.log("codex-autorun background service worker loaded.");
 runtime.onInstalled.addListener(() => {
   console.log("codex-autorun installed and ready.");
@@ -78,7 +117,7 @@ async function appendHistory(task) {
   }
   const entry = {
     id: task.id,
-    name: task.name ?? `Task ${task.id}`,
+    name: resolveTaskName(task.name, task.id),
     url: task.url ?? null,
     startedAt: task.startedAt ?? new Date().toISOString(),
     status: task.status ?? "working",
@@ -104,12 +143,21 @@ async function updateHistory(task) {
       delete updates[key];
     }
   }
+  if (Object.prototype.hasOwnProperty.call(updates, "name")) {
+    const sanitizedUpdateName = sanitizeTaskName(updates.name);
+    if (sanitizedUpdateName) {
+      updates.name = sanitizedUpdateName;
+    } else {
+      delete updates.name;
+    }
+  }
   const updated = {
     ...existing,
     ...updates,
     status: updates.status ?? existing.status,
     completedAt: updates.completedAt ?? existing.completedAt ?? null,
   };
+  updated.name = resolveTaskName(updated.name ?? existing.name, task.id);
   const nextHistory = [...history];
   nextHistory[index] = updated;
   await storageSet(HISTORY_KEY, nextHistory);
@@ -130,7 +178,25 @@ async function updateHistory(task) {
 }
 
 async function getHistory() {
-  return (await storageGet(HISTORY_KEY)) ?? [];
+  const history = (await storageGet(HISTORY_KEY)) ?? [];
+  let requiresUpdate = false;
+  const normalizedHistory = history.map((entry) => {
+    if (!entry?.id) {
+      return entry;
+    }
+    const resolvedName = resolveTaskName(entry.name, entry.id);
+    if (resolvedName !== entry.name) {
+      requiresUpdate = true;
+      return { ...entry, name: resolvedName };
+    }
+    return entry;
+  });
+
+  if (requiresUpdate) {
+    await storageSet(HISTORY_KEY, normalizedHistory);
+  }
+
+  return normalizedHistory;
 }
 
 function openTaskInNewTab(url) {
