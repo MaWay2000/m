@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.8 - 2025-09-28
+- Added dedicated SVG toolbar icons so the codex-autorun button is visible in the menu bar again.
+
 # 1.1.7 - 2025-09-28
 - Added explicit 19 px/38 px SVG toolbar icons in the manifest so the browser menu button renders without requiring binary assets.
 
