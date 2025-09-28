@@ -452,7 +452,19 @@ async function autoClickConfirmMerge(){
   highlightTimeline(taskId,'confirmed');
 }
 
-function scanOnce(fromPoll=false){ autoOpenTask(); if(!fromPoll){ autoClickCreatePR(); handleViewPROpen(); autoClickMergePR(); autoClickConfirmMerge(); } }
+async function syncTimelineState(){
+  if(!location.hostname.includes('chatgpt.com')) return;
+  if(!location.pathname.startsWith('/codex')){ clearTimeline(); return; }
+  try{
+    const [shared,settings]=await Promise.all([getSharedFlow(),getSettings()]);
+    mountTimeline(shared,settings);
+    highlightTimeline(shared&&shared.taskId,shared&&shared.flow);
+  }catch(e){
+    if((DEFAULTS.debugLogs||false)&&console&&console.warn) console.warn('auto-pr timeline sync failed',e);
+  }
+}
+
+function scanOnce(fromPoll=false){ syncTimelineState(); autoOpenTask(); if(!fromPoll){ autoClickCreatePR(); handleViewPROpen(); autoClickMergePR(); autoClickConfirmMerge(); } }
 function scan(){ scanOnce(false); }
 const obs=new MutationObserver(()=>scan()); obs.observe(document.documentElement||document.body,{childList:true,subtree:true});
 (function(){const p=history.pushState, r=history.replaceState;
