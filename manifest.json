@@ -1,14 +1,14 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "Sample WebExtension",
   "version": "1.0.0",
   "description": "A starter WebExtension with background script and popup.",
-  "action": {
+  "browser_action": {
     "default_title": "Sample Extension",
     "default_popup": "src/popup.html"
   },
   "background": {
-    "service_worker": "src/background.js",
-    "type": "module"
+    "scripts": ["src/background.js"],
+    "persistent": false
   }
 }
