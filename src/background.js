@@ -15,6 +15,7 @@ const autoProcessingTasks = new Set();
 
 const HISTORY_KEY = "codexTaskHistory";
 const CLOSED_TASKS_KEY = "codexClosedTaskIds";
+const MAX_HISTORY_ENTRY_AGE_MS = 5 * 60 * 1000;
 
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -61,6 +62,47 @@ function normalizeTaskId(taskId) {
   }
   const normalized = String(taskId).trim();
   return normalized;
+}
+
+function getHistoryEntryTimestamp(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  const timestamps = [];
+
+  if (entry.completedAt) {
+    const completed = Date.parse(entry.completedAt);
+    if (Number.isFinite(completed)) {
+      timestamps.push(completed);
+    }
+  }
+
+  if (entry.startedAt) {
+    const started = Date.parse(entry.startedAt);
+    if (Number.isFinite(started)) {
+      timestamps.push(started);
+    }
+  }
+
+  if (!timestamps.length) {
+    return null;
+  }
+
+  return Math.max(...timestamps);
+}
+
+function isHistoryEntryStale(entry, now = Date.now()) {
+  if (!Number.isFinite(now)) {
+    return false;
+  }
+
+  const timestamp = getHistoryEntryTimestamp(entry);
+  if (timestamp === null || !Number.isFinite(timestamp) || timestamp > now) {
+    return false;
+  }
+
+  return now - timestamp > MAX_HISTORY_ENTRY_AGE_MS;
 }
 
 async function readClosedTasks() {
@@ -168,6 +210,7 @@ async function appendHistory(task) {
   if (!id) {
     return;
   }
+  const now = Date.now();
   const { set: closedSet } = await readClosedTasks();
   if (closedSet.has(id)) {
     return;
@@ -184,6 +227,11 @@ async function appendHistory(task) {
     startedAt: task.startedAt ?? new Date().toISOString(),
     status: task.status ?? "working",
   };
+
+  if (isHistoryEntryStale(entry, now)) {
+    return;
+  }
+
   const nextHistory = [entry, ...history].slice(0, 200);
   await storageSet(HISTORY_KEY, nextHistory);
   console.log("Tracked codex task", entry);
@@ -194,6 +242,7 @@ async function updateHistory(task) {
   if (!id) {
     return;
   }
+  const now = Date.now();
   const { set: closedSet } = await readClosedTasks();
   if (closedSet.has(id)) {
     return;
@@ -211,6 +260,9 @@ async function updateHistory(task) {
       status: task?.status ?? "working",
       completedAt: task?.completedAt ?? null,
     };
+    if (isHistoryEntryStale(entry, now)) {
+      return;
+    }
     const nextHistory = [entry, ...history].slice(0, 200);
     await storageSet(HISTORY_KEY, nextHistory);
     console.log("Appended missing codex task entry", entry);
@@ -240,6 +292,13 @@ async function updateHistory(task) {
     completedAt: updates.completedAt ?? existing.completedAt ?? null,
   };
   updated.name = resolveTaskName(updated.name ?? existing.name, id);
+  if (isHistoryEntryStale(updated, now)) {
+    const nextHistory = history.filter((_, i) => i !== index);
+    await storageSet(HISTORY_KEY, nextHistory);
+    console.log("Pruned stale codex task", updated);
+    return;
+  }
+
   const nextHistory = [...history];
   nextHistory[index] = updated;
   await storageSet(HISTORY_KEY, nextHistory);
@@ -262,6 +321,7 @@ async function updateHistory(task) {
 async function getHistory() {
   const history = (await storageGet(HISTORY_KEY)) ?? [];
   const { set: closedSet } = await readClosedTasks();
+  const now = Date.now();
 
   if (!Array.isArray(history)) {
     return [];
@@ -285,6 +345,11 @@ async function getHistory() {
     }
 
     if (closedSet.has(normalizedId)) {
+      requiresUpdate = true;
+      continue;
+    }
+
+    if (isHistoryEntryStale(entry, now)) {
       requiresUpdate = true;
       continue;
     }
