@@ -1,8 +1,9 @@
 {
   "manifest_version": 2,
   "name": "codex-autorun",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "The codex-autorun WebExtension with background script and popup.",
+  "permissions": ["storage"],
   "browser_action": {
     "default_title": "codex-autorun",
     "default_popup": "src/popup.html",
@@ -11,5 +12,12 @@
   "background": {
     "scripts": ["src/background.js"],
     "persistent": false
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/codex*"],
+      "js": ["src/codexWatcher.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }

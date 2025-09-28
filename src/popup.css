@@ -1,6 +1,10 @@
-body {
+:root {
+  color-scheme: light;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  min-width: 240px;
+}
+
+body {
+  min-width: 320px;
   margin: 0;
   padding: 16px;
   background-color: #f9fafb;
@@ -10,23 +14,156 @@ body {
 main {
   display: flex;
   flex-direction: column;
+  gap: 1rem;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
+}
+
+.banner h1 {
+  font-size: 1.125rem;
+  margin: 0;
+}
+
+.description {
+  margin: 0;
+  color: #475569;
+  font-size: 0.9rem;
 }
 
 button {
   cursor: pointer;
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.75rem;
   border: 1px solid #2563eb;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   background: #3b82f6;
   color: #ffffff;
   font-weight: 600;
+  font-size: 0.85rem;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   background: #2563eb;
 }
 
-output {
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.history {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  padding: 0.75rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+}
+
+.history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.history-heading h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0c4a6e;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.empty {
+  margin: 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.history-item:hover {
+  border-color: #cbd5f5;
+  background: #eef2ff;
+}
+
+.task-name {
+  font-weight: 600;
+  color: #1e3a8a;
+  text-decoration: none;
+}
+
+.task-name:hover {
+  text-decoration: underline;
+}
+
+.task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.task-id {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.375rem;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-weight: 500;
+}
+
+.task-started {
+  color: #1f2937;
+}
+
+.task-status {
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.375rem;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+#error {
   min-height: 1.25rem;
+  color: #b91c1c;
+  font-size: 0.8rem;
 }

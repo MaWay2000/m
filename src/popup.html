@@ -7,10 +7,22 @@
   </head>
   <body>
     <main>
-      <h1>codex-autorun</h1>
-      <p>This popup confirms the codex-autorun extension is loaded.</p>
-      <button id="ping">Send ping</button>
-      <output id="response" aria-live="polite"></output>
+      <header class="banner">
+        <h1>codex-autorun</h1>
+        <button id="refresh" type="button" title="Refresh history">Refresh</button>
+      </header>
+      <p class="description">
+        Monitoring for Codex tasks that show the working indicator square.
+      </p>
+      <section class="history" aria-labelledby="history-title">
+        <div class="history-heading">
+          <h2 id="history-title">Task history</h2>
+          <span id="history-count" class="count-badge" hidden></span>
+        </div>
+        <p id="empty-state" class="empty">No tasks detected yet.</p>
+        <ol id="history" class="history-list"></ol>
+      </section>
+      <output id="error" role="status" aria-live="polite"></output>
     </main>
     <script type="module" src="popup.js"></script>
   </body>
