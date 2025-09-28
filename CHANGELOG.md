@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.11 - 2025-09-28
+- Added toolbar icon sizes to the manifest icon map so Safari keeps the codex-autorun button visible in the menu bar.
+
 # 1.1.10 - 2025-09-28
 - Inject the Codex watcher on debuggpt.tools so new tasks appear in the history again.
 
