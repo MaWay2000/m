@@ -5,20 +5,20 @@
   "description": "The codex-autorun WebExtension with background script and popup.",
   "permissions": ["storage", "tabs", "https://chatgpt.com/*"],
   "icons": {
-    "16": "src/icons/icon-16.svg",
-    "32": "src/icons/icon-32.svg",
-    "48": "src/icons/icon-48.svg"
+    "16": "src/icons/icon-16.png",
+    "32": "src/icons/icon-32.png",
+    "48": "src/icons/icon-48.png"
   },
   "browser_action": {
     "default_title": "codex-autorun",
     "default_popup": "src/popup.html",
     "default_area": "navbar",
     "default_icon": {
-      "16": "src/icons/icon-16.svg",
-      "19": "src/icons/icon-19.svg",
-      "32": "src/icons/icon-32.svg",
-      "38": "src/icons/icon-38.svg",
-      "48": "src/icons/icon-48.svg"
+      "16": "src/icons/icon-16.png",
+      "19": "src/icons/icon-19.png",
+      "32": "src/icons/icon-32.png",
+      "38": "src/icons/icon-38.png",
+      "48": "src/icons/icon-48.png"
     }
   },
   "background": {
