@@ -1,10 +1,10 @@
 {
   "manifest_version": 2,
-  "name": "Sample WebExtension",
-  "version": "1.0.1",
-  "description": "A starter WebExtension with background script and popup.",
+  "name": "codex-autorun",
+  "version": "1.0.2",
+  "description": "The codex-autorun WebExtension with background script and popup.",
   "browser_action": {
-    "default_title": "Sample Extension",
+    "default_title": "codex-autorun",
     "default_popup": "src/popup.html"
   },
   "background": {
