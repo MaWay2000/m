@@ -158,5 +158,16 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "update-task-status") {
+    updateHistory(message.task).then(
+      () => sendResponse?.({ type: "ack" }),
+      (error) => {
+        console.error("Failed to update task status", error);
+        sendResponse?.({ type: "error", message: String(error) });
+      },
+    );
+    return true;
+  }
+
   return false;
 });
