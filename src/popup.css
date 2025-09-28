@@ -237,6 +237,11 @@ button:disabled {
   color: #4338ca;
 }
 
+.task-status--merged {
+  background: #bbf7d0;
+  color: #166534;
+}
+
 .task-actions {
   display: flex;
   flex-direction: column;
