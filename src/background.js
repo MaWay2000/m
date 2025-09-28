@@ -133,9 +133,23 @@ async function updateHistory(task) {
   }
   const history = (await storageGet(HISTORY_KEY)) ?? [];
   const index = history.findIndex((entry) => entry.id === task.id);
+
   if (index === -1) {
+    const sanitizedName = sanitizeTaskName(task?.name);
+    const entry = {
+      id: task.id,
+      name: resolveTaskName(sanitizedName || task?.name, task.id),
+      url: task?.url ?? null,
+      startedAt: task?.startedAt ?? new Date().toISOString(),
+      status: task?.status ?? "working",
+      completedAt: task?.completedAt ?? null,
+    };
+    const nextHistory = [entry, ...history].slice(0, 200);
+    await storageSet(HISTORY_KEY, nextHistory);
+    console.log("Appended missing codex task entry", entry);
     return;
   }
+
   const existing = history[index];
   const updates = { ...task };
   for (const key of Object.keys(updates)) {
