@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.3 - 2025-09-28
+- Automatically click the Codex **Create PR** button after opening ready tasks in a new tab.
+
 # 1.1.2 - 2025-09-28
 - Automated the **Create PR** action for ready tasks and update their status to **PR created** when successful.
 
