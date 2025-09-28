@@ -1,7 +1,7 @@
-console.log("Sample WebExtension background service worker loaded.");
+console.log("codex-autorun background service worker loaded.");
 
 browser.runtime.onInstalled.addListener(() => {
-  console.log("Sample WebExtension installed and ready.");
+  console.log("codex-autorun installed and ready.");
 });
 
 browser.runtime.onMessage.addListener(async (message) => {
