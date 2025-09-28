@@ -215,6 +215,10 @@ function mountTimeline(shared,settings){
   }
   const maybeSettings=settings?Promise.resolve(settings):getSettings();
   maybeSettings.then(s=>{
+    if(location.hostname.includes('github.com')){
+      clearTimeline();
+      return;
+    }
     if(!s.showTimeline){
       clearTimeline();
       return;
