@@ -4,6 +4,7 @@ const runtime =
     : chrome?.runtime;
 
 const trackedTasks = new Map();
+const knownTaskNames = new Map();
 const MIN_SQUARE_SIZE = 6;
 const MAX_SQUARE_SIZE = 24;
 const AUTO_CLICK_MAX_ATTEMPTS = 120;
@@ -102,6 +103,39 @@ const PREFERRED_TASK_TEXT_SELECTORS = [
   "article p",
   "p[data-testid]",
 ];
+
+const CONVERSATION_TASK_SELECTORS = [
+  "[data-message-author-role='user']",
+  "[data-testid*='user-message' i]",
+  "[data-testid*='task-prompt' i]",
+  "[data-testid*='prompt-message' i]",
+  "main [data-message-author-role='user']",
+];
+
+const MAX_TRACKED_NAME_ENTRIES = 400;
+const MAX_TASK_NAME_LENGTH = 500;
+
+function rememberTaskName(taskId, name) {
+  if (!taskId || !name) {
+    return;
+  }
+  const normalizedName = normalizeTextContent(name);
+  if (!normalizedName) {
+    return;
+  }
+  const limitedName =
+    normalizedName.length > MAX_TASK_NAME_LENGTH
+      ? `${normalizedName.slice(0, MAX_TASK_NAME_LENGTH - 1).trim()}…`
+      : normalizedName;
+  knownTaskNames.set(taskId, limitedName);
+  if (knownTaskNames.size > MAX_TRACKED_NAME_ENTRIES) {
+    const excess = knownTaskNames.size - MAX_TRACKED_NAME_ENTRIES;
+    const keys = Array.from(knownTaskNames.keys());
+    for (let index = 0; index < excess; index += 1) {
+      knownTaskNames.delete(keys[index]);
+    }
+  }
+}
 
 function normalizeTextContent(value) {
   if (!value) {
@@ -264,6 +298,30 @@ function extractTaskName(container, link) {
   return fallbackText || null;
 }
 
+function extractConversationTaskName() {
+  const collected = new Set();
+
+  for (const selector of CONVERSATION_TASK_SELECTORS) {
+    const elements = document.querySelectorAll(selector);
+    for (const element of elements) {
+      if (!element || collected.has(element)) {
+        continue;
+      }
+      collected.add(element);
+      const text = extractTaskName(element, null);
+      if (!isMeaningfulTaskText(text)) {
+        continue;
+      }
+      if (/\bwhat should we code next\b/i.test(text)) {
+        continue;
+      }
+      return text;
+    }
+  }
+
+  return null;
+}
+
 function extractTaskUrl(link) {
   if (!link) {
     return null;
@@ -313,6 +371,71 @@ function notifyTaskReady(task) {
   }
 }
 
+function notifyTaskUpdate(task) {
+  if (!runtime?.sendMessage) {
+    return;
+  }
+  try {
+    const payload = { ...task };
+    const result = runtime.sendMessage({
+      type: "square-status-updated",
+      task: payload,
+    });
+    if (result && typeof result.catch === "function") {
+      result.catch(() => {});
+    }
+  } catch (error) {
+    console.warn("codex-autorun: failed to update task info", error);
+  }
+}
+
+function updateCurrentTaskNameFromConversation() {
+  const currentTaskId = extractTaskId(window.location.href);
+  if (!currentTaskId) {
+    return;
+  }
+
+  const conversationName = extractConversationTaskName();
+  if (!conversationName) {
+    return;
+  }
+
+  const normalizedName = normalizeTextContent(conversationName);
+  if (!normalizedName) {
+    return;
+  }
+
+  let limitedName = normalizedName;
+  if (limitedName.length > MAX_TASK_NAME_LENGTH) {
+    limitedName = `${limitedName.slice(0, MAX_TASK_NAME_LENGTH - 1).trim()}…`;
+  }
+
+  const previousName = knownTaskNames.get(currentTaskId);
+  if (previousName && previousName === limitedName) {
+    return;
+  }
+
+  rememberTaskName(currentTaskId, limitedName);
+
+  const tracked = trackedTasks.get(currentTaskId);
+  if (tracked) {
+    tracked.name = limitedName;
+  }
+
+  const updatePayload = { id: currentTaskId, name: limitedName };
+  if (tracked?.url) {
+    updatePayload.url = tracked.url;
+  }
+  if (tracked?.startedAt) {
+    updatePayload.startedAt = tracked.startedAt;
+  }
+  if (tracked?.status) {
+    updatePayload.status = tracked.status;
+  }
+
+  notifyTaskUpdate(updatePayload);
+}
+
 function scanForTasks() {
   const links = Array.from(document.querySelectorAll('a[href*="/codex/tasks/"]'));
   const seenIds = new Set();
@@ -331,15 +454,20 @@ function scanForTasks() {
     if (indicator) {
       if (!trackedTasks.has(taskId)) {
         const name = extractTaskName(container, link) ?? `Task ${taskId}`;
+        rememberTaskName(taskId, name);
+        const storedName = knownTaskNames.get(taskId) ?? name;
         const url = extractTaskUrl(link);
         const startedAt = new Date().toISOString();
-        const task = { name, url, startedAt, status: "working" };
+        const task = { name: storedName, url, startedAt, status: "working" };
         trackedTasks.set(taskId, task);
         notifyBackground({ id: taskId, ...task });
       }
     } else if (trackedTasks.has(taskId)) {
       const tracked = trackedTasks.get(taskId);
       trackedTasks.delete(taskId);
+      if (tracked?.name) {
+        rememberTaskName(taskId, tracked.name);
+      }
       notifyTaskReady({
         id: taskId,
         status: "ready",
@@ -355,6 +483,9 @@ function scanForTasks() {
     if (!seenIds.has(trackedId)) {
       const tracked = trackedTasks.get(trackedId);
       trackedTasks.delete(trackedId);
+      if (tracked?.name) {
+        rememberTaskName(trackedId, tracked.name);
+      }
       notifyTaskReady({
         id: trackedId,
         status: "ready",
@@ -365,6 +496,8 @@ function scanForTasks() {
       });
     }
   }
+
+  updateCurrentTaskNameFromConversation();
 }
 
 function elementTextMatches(element, text) {
