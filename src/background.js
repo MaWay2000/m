@@ -10,16 +10,214 @@ const tabs =
   typeof browser !== "undefined" && browser?.tabs
     ? browser.tabs
     : chrome?.tabs;
+const notifications =
+  typeof browser !== "undefined" && browser?.notifications
+    ? browser.notifications
+    : typeof chrome !== "undefined" && chrome?.notifications
+      ? chrome.notifications
+      : null;
 
 const autoProcessingTasks = new Set();
 
 const HISTORY_KEY = "codexTaskHistory";
 const CLOSED_TASKS_KEY = "codexClosedTaskIds";
+const NOTIFICATION_STATUS_STORAGE_KEY = "codexNotificationStatuses";
+const DEFAULT_NOTIFICATION_STATUSES = ["ready", "merged"];
+const STATUS_VALUE_SET = new Set(["ready", "pr-created", "merged"]);
+let notificationEnabledStatuses = new Set(DEFAULT_NOTIFICATION_STATUSES);
+const notificationTaskUrls = new Map();
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
   /just now/gi,
   /committing changes?/gi,
 ];
+const STATUS_LABELS = {
+  ready: "Ready",
+  "pr-created": "PR created",
+  merged: "Merged",
+};
+
+function sanitizeStatusList(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const sanitized = [];
+  const seen = new Set();
+
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+
+    const normalized = entry.trim().toLowerCase();
+    if (!normalized || seen.has(normalized) || !STATUS_VALUE_SET.has(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    sanitized.push(normalized);
+  }
+
+  return sanitized;
+}
+
+function updateNotificationEnabledStatuses(statuses) {
+  notificationEnabledStatuses = new Set(statuses);
+}
+
+async function loadNotificationPreferences() {
+  try {
+    const stored = await storageGet(NOTIFICATION_STATUS_STORAGE_KEY);
+    const sanitized = sanitizeStatusList(stored);
+    const statuses =
+      sanitized !== null ? sanitized : DEFAULT_NOTIFICATION_STATUSES;
+    updateNotificationEnabledStatuses(statuses);
+  } catch (error) {
+    console.error("Failed to load notification preferences", error);
+    updateNotificationEnabledStatuses(DEFAULT_NOTIFICATION_STATUSES);
+  }
+}
+
+function formatStatusLabel(status) {
+  if (!status) {
+    return "";
+  }
+
+  const normalized = String(status).trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+
+  return STATUS_LABELS[normalized] ?? normalized;
+}
+
+function createNotification(options) {
+  if (!notifications?.create) {
+    return Promise.resolve(null);
+  }
+
+  try {
+    const result = notifications.create("", options);
+    if (result && typeof result.then === "function") {
+      return result;
+    }
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      notifications.create("", options, (notificationId) => {
+        if (runtime?.lastError) {
+          reject(new Error(runtime.lastError.message));
+          return;
+        }
+        resolve(notificationId ?? null);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function clearNotification(notificationId) {
+  if (!notificationId || !notifications?.clear) {
+    return;
+  }
+
+  try {
+    const result = notifications.clear(notificationId);
+    if (result && typeof result.then === "function") {
+      result.catch((error) => {
+        console.error("Failed to clear notification", error);
+      });
+    }
+  } catch (error) {
+    console.error("Failed to clear notification", error);
+  }
+}
+
+async function showStatusNotification(task, statusKey) {
+  if (!notifications?.create) {
+    return;
+  }
+
+  const statusLabel = formatStatusLabel(statusKey);
+  const taskId = normalizeTaskId(task?.id);
+  const taskName = resolveTaskName(task?.name, taskId);
+  const iconUrl = runtime?.getURL
+    ? runtime.getURL("src/icons/icon-128.png")
+    : undefined;
+
+  const message = taskName || (taskId ? `Task ${taskId}` : "Tracked task");
+  const contextMessage = taskId
+    ? `Task ${taskId} is now ${statusLabel}.`
+    : `Status changed to ${statusLabel}.`;
+
+  try {
+    const notificationId = await createNotification({
+      type: "basic",
+      iconUrl,
+      title: `${statusLabel} task`,
+      message,
+      contextMessage: task?.url ? `${contextMessage} Click to open.` : contextMessage,
+    });
+
+    if (notificationId && task?.url) {
+      notificationTaskUrls.set(notificationId, task.url);
+    }
+  } catch (error) {
+    console.error("Failed to create notification", error);
+  }
+}
+
+loadNotificationPreferences();
+
+const storageChangeEmitter =
+  typeof browser !== "undefined" && browser?.storage?.onChanged
+    ? browser.storage.onChanged
+    : typeof chrome !== "undefined" && chrome?.storage?.onChanged
+      ? chrome.storage.onChanged
+      : null;
+
+if (storageChangeEmitter) {
+  storageChangeEmitter.addListener((changes, areaName) => {
+    if (areaName !== "local" || !changes) {
+      return;
+    }
+
+    const notificationChange = changes[NOTIFICATION_STATUS_STORAGE_KEY];
+    if (notificationChange) {
+      const sanitized = sanitizeStatusList(notificationChange.newValue);
+      if (sanitized !== null) {
+        updateNotificationEnabledStatuses(sanitized);
+      } else {
+        updateNotificationEnabledStatuses(DEFAULT_NOTIFICATION_STATUSES);
+      }
+    }
+  });
+}
+
+if (notifications?.onClicked) {
+  notifications.onClicked.addListener((notificationId) => {
+    const url = notificationTaskUrls.get(notificationId);
+    if (url) {
+      openTaskInNewTab(url).catch((error) => {
+        console.error("Failed to open task from notification", error);
+      });
+    }
+
+    notificationTaskUrls.delete(notificationId);
+    clearNotification(notificationId);
+  });
+}
+
+if (notifications?.onClosed) {
+  notifications.onClosed.addListener((notificationId) => {
+    notificationTaskUrls.delete(notificationId);
+  });
+}
 
 function sanitizeTaskName(value) {
   if (value === null || value === undefined) {
@@ -263,6 +461,17 @@ async function updateHistory(task) {
     nextStatus === "ready" &&
     previousStatus !== "ready" &&
     previousStatus !== "pr-created";
+
+  const shouldNotify =
+    nextStatus &&
+    nextStatus !== previousStatus &&
+    notificationEnabledStatuses.has(nextStatus);
+
+  if (shouldNotify) {
+    showStatusNotification(updated, nextStatus).catch((error) => {
+      console.error("Failed to show status notification", error);
+    });
+  }
 
   if (becameReady) {
     autoHandleReadyTask(updated).catch((error) => {
