@@ -26,12 +26,6 @@ When a tracked task leaves the "working" state, the popup now highlights it as *
 
 The extension remains installed until you restart Firefox. Repeat the steps above to load it again after restarting the browser.
 
-## Keep the toolbar button pinned
-
-Firefox may occasionally move codex-autorun into the overflow menu right after an update.
-If the button disappears, open the overflow (⋮) or puzzle icon, right-click **codex-autorun**, and choose **Pin to Toolbar**.
-On Chromium-based browsers you can pin it by toggling the pushpin icon next to codex-autorun in the extensions list.
-
 ## Project update rules
 
 To keep the project history consistent:

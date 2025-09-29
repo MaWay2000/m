@@ -1,8 +1,5 @@
 # Changelog
 
-# 1.1.15 - 2025-09-28
-- Show a toolbar pinning reminder after installs and updates so the codex-autorun button stays visible.
-
 # 1.1.14 - 2025-09-28
 - Restore the SVG toolbar icons in the manifest so the codex-autorun button reappears in the menu bar.
 
