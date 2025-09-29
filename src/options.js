@@ -10,14 +10,14 @@ const STATUS_VALUES = new Set(STATUS_OPTIONS);
 const SOUND_STATUSES = [...STATUS_OPTIONS];
 const SOUND_STATUS_STORAGE_KEY = "codexSoundStatuses";
 const SOUND_SELECTION_STORAGE_KEY = "codexSoundSelections";
-const DEFAULT_SOUND_STATUSES = ["ready", "merged"];
+const DEFAULT_SOUND_STATUSES = ["ready", "pr-created"];
 const DEFAULT_SOUND_SELECTIONS = {
   ready: "1.mp3",
   "pr-created": "1.mp3",
   merged: "1.mp3",
 };
 const NOTIFICATION_STATUS_STORAGE_KEY = "codexNotificationStatuses";
-const DEFAULT_NOTIFICATION_STATUSES = ["ready", "merged"];
+const DEFAULT_NOTIFICATION_STATUSES = ["ready", "pr-created"];
 const SOUND_FILE_OPTIONS = [
   "1.mp3",
   "2.mp3",
