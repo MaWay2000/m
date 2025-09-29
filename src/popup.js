@@ -22,7 +22,27 @@ let userHasInteracted = false;
 let currentSettings = normalizeSettings();
 
 function applySettings(nextSettings) {
+  const previousSettings = currentSettings;
   currentSettings = normalizeSettings(nextSettings);
+
+  const wasSoundEnabled = previousSettings?.soundNotifications?.enabled !== false;
+  const isSoundEnabled = currentSettings.soundNotifications?.enabled !== false;
+
+  if (!isSoundEnabled && audioContext) {
+    try {
+      const contextToClose = audioContext;
+      audioContext = null;
+      if (typeof contextToClose.close === "function") {
+        contextToClose.close().catch((error) => {
+          console.error("Failed to close audio context", error);
+        });
+      }
+    } catch (error) {
+      console.error("Failed to dispose audio context", error);
+    }
+  } else if (isSoundEnabled && !wasSoundEnabled) {
+    ensureAudioContext();
+  }
 }
 
 function shouldPlaySounds() {
@@ -47,9 +67,14 @@ function ensureAudioContext() {
     }
   }
   if (audioContext?.state === "suspended" && userHasInteracted) {
-    audioContext.resume().catch((error) => {
-      console.error("Failed to resume audio context", error);
-    });
+    audioContext
+      .resume()
+      .then(() => {
+        userHasInteracted = true;
+      })
+      .catch((error) => {
+        console.error("Failed to resume audio context", error);
+      });
   }
   return audioContext ?? null;
 }
@@ -90,16 +115,18 @@ function playNotificationSound(kind = "default") {
   }
 }
 
-window.addEventListener(
-  "pointerdown",
-  () => {
-    userHasInteracted = true;
-    if (shouldPlaySounds()) {
-      ensureAudioContext();
-    }
-  },
-  { once: true, capture: true },
-);
+function handleUserInteraction() {
+  userHasInteracted = true;
+  if (shouldPlaySounds()) {
+    ensureAudioContext();
+  }
+}
+
+for (const eventName of ["pointerdown", "mousedown", "touchstart", "keydown"]) {
+  window.addEventListener(eventName, handleUserInteraction, {
+    capture: true,
+  });
+}
 
 const MAX_AUTO_CREATE_PR_AGE_MS = 5 * 60 * 1000;
 
