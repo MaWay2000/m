@@ -16,6 +16,7 @@ const autoProcessingTasks = new Set();
 const HISTORY_KEY = "codexTaskHistory";
 const CLOSED_TASKS_KEY = "codexClosedTaskIds";
 const PIN_REMINDER_DISMISSED_KEY = "codexPinReminderDismissed";
+const SETTINGS_KEY = "codexSettings";
 
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -126,13 +127,8 @@ runtime.onInstalled.addListener(async (details) => {
     return;
   }
 
-  try {
-    const dismissed = await storageGet(PIN_REMINDER_DISMISSED_KEY);
-    if (dismissed) {
-      return;
-    }
-  } catch (error) {
-    console.error("Failed to read pin reminder preference", error);
+  const shouldShowReminder = await shouldShowPinReminder();
+  if (!shouldShowReminder) {
     return;
   }
 
@@ -178,6 +174,36 @@ function openPinReminderPage() {
   }
 
   return Promise.resolve();
+}
+
+async function shouldShowPinReminder() {
+  let pinReminderEnabled = true;
+  try {
+    const settings = await storageGet(SETTINGS_KEY);
+    if (settings && typeof settings === "object") {
+      const rawEnabled = settings?.pinReminder?.enabled;
+      if (rawEnabled !== undefined) {
+        pinReminderEnabled = Boolean(rawEnabled);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to read extension settings", error);
+  }
+
+  if (!pinReminderEnabled) {
+    return false;
+  }
+
+  try {
+    const dismissed = await storageGet(PIN_REMINDER_DISMISSED_KEY);
+    if (dismissed) {
+      return false;
+    }
+  } catch (error) {
+    console.error("Failed to read pin reminder preference", error);
+  }
+
+  return true;
 }
 
 function storageGet(key) {

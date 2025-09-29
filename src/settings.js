@@ -1,7 +1,11 @@
 const SETTINGS_KEY = "codexSettings";
+const PIN_REMINDER_DISMISSED_KEY = "codexPinReminderDismissed";
 
 export const DEFAULT_SETTINGS = Object.freeze({
   soundNotifications: {
+    enabled: true,
+  },
+  pinReminder: {
     enabled: true,
   },
 });
@@ -10,6 +14,9 @@ function cloneDefaultSettings() {
   return {
     soundNotifications: {
       enabled: DEFAULT_SETTINGS.soundNotifications.enabled,
+    },
+    pinReminder: {
+      enabled: DEFAULT_SETTINGS.pinReminder.enabled,
     },
   };
 }
@@ -81,6 +88,36 @@ function wrapStorageSet(storage, key, value) {
   });
 }
 
+function wrapStorageRemove(storage, key) {
+  if (!storage?.remove) {
+    return Promise.resolve();
+  }
+  try {
+    const result = storage.remove(key);
+    if (result && typeof result.then === "function") {
+      return result.then(() => {});
+    }
+  } catch (error) {
+    console.error("Failed to remove extension storage key", error);
+  }
+  return new Promise((resolve) => {
+    try {
+      storage.remove(key, () => {
+        if (typeof chrome !== "undefined" && chrome?.runtime?.lastError) {
+          console.error(
+            "Storage remove error",
+            chrome.runtime.lastError.message || chrome.runtime.lastError,
+          );
+        }
+        resolve();
+      });
+    } catch (error) {
+      console.error("Storage remove failed", error);
+      resolve();
+    }
+  });
+}
+
 export function normalizeSettings(rawValue = {}) {
   const normalized = cloneDefaultSettings();
 
@@ -96,6 +133,15 @@ export function normalizeSettings(rawValue = {}) {
         rawValue.playSoundNotifications,
       );
     }
+
+    const rawPinReminder = rawValue.pinReminder;
+    if (rawPinReminder && typeof rawPinReminder === "object") {
+      if (rawPinReminder.enabled !== undefined) {
+        normalized.pinReminder.enabled = Boolean(rawPinReminder.enabled);
+      }
+    } else if (rawValue.pinReminderEnabled !== undefined) {
+      normalized.pinReminder.enabled = Boolean(rawValue.pinReminderEnabled);
+    }
   }
 
   return normalized;
@@ -106,8 +152,15 @@ export async function getSettings() {
   if (!storage) {
     return cloneDefaultSettings();
   }
-  const raw = await wrapStorageGet(storage, SETTINGS_KEY);
-  return normalizeSettings(raw);
+  const [raw, legacyDismissed] = await Promise.all([
+    wrapStorageGet(storage, SETTINGS_KEY),
+    wrapStorageGet(storage, PIN_REMINDER_DISMISSED_KEY),
+  ]);
+  const normalized = normalizeSettings(raw);
+  if (legacyDismissed === true) {
+    normalized.pinReminder.enabled = false;
+  }
+  return normalized;
 }
 
 async function writeSettings(nextSettings) {
@@ -117,6 +170,7 @@ async function writeSettings(nextSettings) {
   }
   const normalized = normalizeSettings(nextSettings);
   await wrapStorageSet(storage, SETTINGS_KEY, normalized);
+  await syncLegacyPinReminderFlag(storage, normalized.pinReminder.enabled !== false);
   return normalized;
 }
 
@@ -129,6 +183,10 @@ export async function saveSettings(partialSettings) {
       ...current.soundNotifications,
       ...(partialSettings?.soundNotifications || {}),
     },
+    pinReminder: {
+      ...current.pinReminder,
+      ...(partialSettings?.pinReminder || {}),
+    },
   });
   return writeSettings(next);
 }
@@ -136,6 +194,14 @@ export async function saveSettings(partialSettings) {
 export async function setSoundNotificationsEnabled(enabled) {
   return saveSettings({
     soundNotifications: {
+      enabled: Boolean(enabled),
+    },
+  });
+}
+
+export async function setPinReminderEnabled(enabled) {
+  return saveSettings({
+    pinReminder: {
       enabled: Boolean(enabled),
     },
   });
@@ -189,3 +255,12 @@ export function addSettingsChangeListener(callback) {
 }
 
 export { SETTINGS_KEY };
+
+async function syncLegacyPinReminderFlag(storage, pinReminderEnabled) {
+  const isEnabled = pinReminderEnabled !== false;
+  if (isEnabled) {
+    await wrapStorageRemove(storage, PIN_REMINDER_DISMISSED_KEY);
+    return;
+  }
+  await wrapStorageSet(storage, PIN_REMINDER_DISMISSED_KEY, true);
+}
