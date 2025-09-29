@@ -45,6 +45,26 @@
           extensions menu.
         </p>
       </section>
+      <section
+        class="options__section"
+        aria-labelledby="permission-settings-heading"
+      >
+        <div class="section-heading">
+          <h2 id="permission-settings-heading">Website access</h2>
+          <p class="section-description">
+            Control whether codex-autorun can monitor Codex tasks on every
+            website you visit.
+          </p>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="allow-all-hosts" />
+          <span class="toggle__label">Allow access to all sites</span>
+        </label>
+        <p class="hint">
+          Enable this option if Codex tasks appear on additional domains and you
+          want codex-autorun to watch them automatically.
+        </p>
+      </section>
       <output
         id="options-status"
         class="options__status"
