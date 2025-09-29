@@ -22,9 +22,28 @@ const autoProcessingTasks = new Set();
 const HISTORY_KEY = "codexTaskHistory";
 const CLOSED_TASKS_KEY = "codexClosedTaskIds";
 const NOTIFICATION_STATUS_STORAGE_KEY = "codexNotificationStatuses";
+const NOTIFICATION_SOUND_SELECTION_STORAGE_KEY =
+  "codexNotificationSoundSelections";
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "merged"];
+const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
+  ready: "1.mp3",
+  "pr-created": "1.mp3",
+  merged: "1.mp3",
+};
+const SOUND_FILE_OPTIONS = [
+  "1.mp3",
+  "2.mp3",
+  "3.mp3",
+  "4.mp3",
+  "5.mp3",
+  "6.mp3",
+  "7.mp3",
+  "8.mp3",
+];
+const SOUND_FILE_SET = new Set(SOUND_FILE_OPTIONS);
 const STATUS_VALUE_SET = new Set(["ready", "pr-created", "merged"]);
 let notificationEnabledStatuses = new Set(DEFAULT_NOTIFICATION_STATUSES);
+let notificationSoundSelections = { ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS };
 const notificationTaskUrls = new Map();
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -62,20 +81,58 @@ function sanitizeStatusList(value) {
   return sanitized;
 }
 
+function sanitizeSoundSelectionMap(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const sanitized = {};
+
+  for (const status of STATUS_VALUE_SET) {
+    const rawValue = value?.[status];
+    if (typeof rawValue !== "string") {
+      continue;
+    }
+
+    const normalized = rawValue.trim();
+    if (!normalized || !SOUND_FILE_SET.has(normalized)) {
+      continue;
+    }
+
+    sanitized[status] = normalized;
+  }
+
+  return sanitized;
+}
+
 function updateNotificationEnabledStatuses(statuses) {
   notificationEnabledStatuses = new Set(statuses);
 }
 
+function updateNotificationSoundSelections(selections) {
+  notificationSoundSelections = {
+    ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS,
+    ...(selections ?? {}),
+  };
+}
+
 async function loadNotificationPreferences() {
   try {
-    const stored = await storageGet(NOTIFICATION_STATUS_STORAGE_KEY);
-    const sanitized = sanitizeStatusList(stored);
+    const [storedStatuses, storedSelections] = await Promise.all([
+      storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
+      storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
+    ]);
+    const sanitizedStatuses = sanitizeStatusList(storedStatuses);
     const statuses =
-      sanitized !== null ? sanitized : DEFAULT_NOTIFICATION_STATUSES;
+      sanitizedStatuses !== null ? sanitizedStatuses : DEFAULT_NOTIFICATION_STATUSES;
     updateNotificationEnabledStatuses(statuses);
+
+    const sanitizedSelections = sanitizeSoundSelectionMap(storedSelections);
+    updateNotificationSoundSelections(sanitizedSelections);
   } catch (error) {
     console.error("Failed to load notification preferences", error);
     updateNotificationEnabledStatuses(DEFAULT_NOTIFICATION_STATUSES);
+    updateNotificationSoundSelections(null);
   }
 }
 
@@ -138,6 +195,61 @@ function clearNotification(notificationId) {
   }
 }
 
+function getSoundFileUrl(fileName) {
+  if (!fileName) {
+    return null;
+  }
+
+  try {
+    if (typeof runtime?.getURL === "function") {
+      return runtime.getURL(`src/sounds/${fileName}`);
+    }
+  } catch (error) {
+    console.error("Failed to resolve sound file URL", error);
+  }
+
+  if (typeof chrome !== "undefined" && typeof chrome.runtime?.getURL === "function") {
+    return chrome.runtime.getURL(`src/sounds/${fileName}`);
+  }
+
+  return `src/sounds/${fileName}`;
+}
+
+function playBrowserNotificationSound(statusKey) {
+  if (typeof Audio !== "function") {
+    return;
+  }
+
+  const rawSelection = notificationSoundSelections?.[statusKey];
+  const trimmed = typeof rawSelection === "string" ? rawSelection.trim() : "";
+  const normalized =
+    trimmed && SOUND_FILE_SET.has(trimmed)
+      ? trimmed
+      : DEFAULT_NOTIFICATION_SOUND_SELECTIONS[statusKey];
+
+  if (!normalized || !SOUND_FILE_SET.has(normalized)) {
+    return;
+  }
+
+  const url = getSoundFileUrl(normalized);
+  if (!url) {
+    return;
+  }
+
+  try {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    const playResult = audio.play();
+    if (playResult && typeof playResult.catch === "function") {
+      playResult.catch((error) => {
+        console.error("Failed to play browser notification sound", error);
+      });
+    }
+  } catch (error) {
+    console.error("Failed to play browser notification sound", error);
+  }
+}
+
 async function showStatusNotification(task, statusKey) {
   if (!notifications?.create) {
     return;
@@ -167,6 +279,8 @@ async function showStatusNotification(task, statusKey) {
     if (notificationId && task?.url) {
       notificationTaskUrls.set(notificationId, task.url);
     }
+
+    playBrowserNotificationSound(statusKey);
   } catch (error) {
     console.error("Failed to create notification", error);
   }
@@ -195,6 +309,13 @@ if (storageChangeEmitter) {
       } else {
         updateNotificationEnabledStatuses(DEFAULT_NOTIFICATION_STATUSES);
       }
+    }
+
+    const notificationSoundChange =
+      changes[NOTIFICATION_SOUND_SELECTION_STORAGE_KEY];
+    if (notificationSoundChange) {
+      const sanitized = sanitizeSoundSelectionMap(notificationSoundChange.newValue);
+      updateNotificationSoundSelections(sanitized);
     }
   });
 }
