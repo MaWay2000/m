@@ -13,6 +13,7 @@ const AUTO_CLICK_INTERVAL_MS = 500;
 const NAME_REFRESH_INTERVAL_MS = 60 * 1000;
 const MAX_NAME_REFRESH_ATTEMPTS = 30;
 const MAX_NAME_REFRESH_MISSES = 30;
+const WORKING_TASK_MISSING_GRACE_MS = 15 * 60 * 1000;
 
 function isTransparentColor(color) {
   if (!color || color === "transparent") {
@@ -731,11 +732,22 @@ function scanForTasks() {
         const storedName = knownTaskNames.get(taskId) ?? name;
         const url = extractTaskUrl(link);
         const startedAt = new Date().toISOString();
-        const task = { name: storedName, url, startedAt, status: "working" };
+        const task = {
+          name: storedName,
+          url,
+          startedAt,
+          status: "working",
+          lastSeenAt: now,
+          missingSince: null,
+        };
         trackedTasks.set(taskId, task);
         notifyBackground({ id: taskId, ...task });
       } else {
         const tracked = trackedTasks.get(taskId);
+        if (tracked) {
+          tracked.lastSeenAt = now;
+          tracked.missingSince = null;
+        }
         let updated = false;
 
         const extractedName = extractTaskName(container, link);
@@ -878,33 +890,49 @@ function scanForTasks() {
   }
 
   for (const trackedId of Array.from(trackedTasks.keys())) {
-    if (!seenIds.has(trackedId)) {
-      const tracked = trackedTasks.get(trackedId);
+    if (seenIds.has(trackedId)) {
+      continue;
+    }
+
+    const tracked = trackedTasks.get(trackedId);
+    if (!tracked) {
       trackedTasks.delete(trackedId);
-      if (tracked?.name) {
-        rememberTaskName(trackedId, tracked.name);
+      continue;
+    }
+
+    if (tracked.status === "working") {
+      const missingSince = tracked.missingSince ?? now;
+      tracked.missingSince = missingSince;
+      if (now - missingSince < WORKING_TASK_MISSING_GRACE_MS) {
+        trackedTasks.set(trackedId, tracked);
+        continue;
       }
-      const completedAt = new Date().toISOString();
-      const readyPayload = {
-        id: trackedId,
-        status: "ready",
+    }
+
+    trackedTasks.delete(trackedId);
+    if (tracked?.name) {
+      rememberTaskName(trackedId, tracked.name);
+    }
+    const completedAt = new Date().toISOString();
+    const readyPayload = {
+      id: trackedId,
+      status: "ready",
+      completedAt,
+      name: tracked?.name,
+      url: tracked?.url,
+      startedAt: tracked?.startedAt,
+    };
+    notifyTaskReady(readyPayload);
+    const knownName = knownTaskNames.get(trackedId) ?? tracked?.name ?? null;
+    if (shouldScheduleNameRefresh(knownName, trackedId)) {
+      scheduleNameRefresh(trackedId, {
+        name: knownName,
+        url: readyPayload.url,
+        startedAt: readyPayload.startedAt,
         completedAt,
-        name: tracked?.name,
-        url: tracked?.url,
-        startedAt: tracked?.startedAt,
-      };
-      notifyTaskReady(readyPayload);
-      const knownName = knownTaskNames.get(trackedId) ?? tracked?.name ?? null;
-      if (shouldScheduleNameRefresh(knownName, trackedId)) {
-        scheduleNameRefresh(trackedId, {
-          name: knownName,
-          url: readyPayload.url,
-          startedAt: readyPayload.startedAt,
-          completedAt,
-        });
-      } else {
-        pendingNameRefreshes.delete(trackedId);
-      }
+      });
+    } else {
+      pendingNameRefreshes.delete(trackedId);
     }
   }
 
