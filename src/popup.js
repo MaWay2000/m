@@ -2,6 +2,12 @@ const runtime =
   typeof browser !== "undefined" && browser?.runtime
     ? browser.runtime
     : chrome?.runtime;
+const storageApi =
+  typeof browser !== "undefined" && browser?.storage
+    ? browser.storage
+    : typeof chrome !== "undefined" && chrome?.storage
+      ? chrome.storage
+      : null;
 const refreshButton = document.getElementById("refresh");
 const historyList = document.getElementById("history");
 const emptyState = document.getElementById("empty-state");
@@ -12,11 +18,109 @@ const openSettingsButton = document.getElementById("open-settings");
 const autoCreatePrTasks = new Set();
 let autoCreatePrQueue = Promise.resolve();
 const lastKnownTaskStatuses = new Map();
-const COMPLETED_STATUS_KEYS = new Set(["ready", "merged"]);
+const COMPLETED_STATUS_KEYS = new Set(["ready", "pr-created", "merged"]);
+
+const SOUND_STATUS_STORAGE_KEY = "codexSoundStatuses";
+const DEFAULT_SOUND_STATUSES = ["ready", "merged"];
+const SOUND_STATUS_VALUES = new Set(["ready", "pr-created", "merged"]);
+let soundEnabledStatuses = new Set(DEFAULT_SOUND_STATUSES);
 
 let hasRenderedHistory = false;
 let audioContext;
 let userHasInteracted = false;
+
+function storageGet(key) {
+  if (!storageApi?.local) {
+    return Promise.resolve(undefined);
+  }
+  try {
+    const result = storageApi.local.get(key);
+    if (result && typeof result.then === "function") {
+      return result.then((data) => data?.[key]);
+    }
+  } catch (error) {
+    console.error("Failed to get storage value", error);
+    return Promise.reject(error);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      storageApi.local.get(key, (data) => {
+        const runtimeError =
+          typeof chrome !== "undefined" && chrome?.runtime?.lastError
+            ? chrome.runtime.lastError
+            : null;
+        if (runtimeError) {
+          reject(new Error(runtimeError.message));
+          return;
+        }
+        resolve(data?.[key]);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function sanitizeSoundStatuses(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const sanitized = [];
+  const seen = new Set();
+  for (const entry of value) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+    const normalized = entry.trim().toLowerCase();
+    if (!normalized || seen.has(normalized) || !SOUND_STATUS_VALUES.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    sanitized.push(normalized);
+  }
+  return sanitized;
+}
+
+function updateSoundEnabledStatuses(statuses) {
+  soundEnabledStatuses = new Set(statuses);
+}
+
+async function loadSoundPreferences() {
+  try {
+    const stored = await storageGet(SOUND_STATUS_STORAGE_KEY);
+    const sanitized = sanitizeSoundStatuses(stored);
+    const statuses = sanitized !== null ? sanitized : DEFAULT_SOUND_STATUSES;
+    updateSoundEnabledStatuses(statuses);
+  } catch (error) {
+    console.error("Failed to load sound preferences", error);
+    updateSoundEnabledStatuses(DEFAULT_SOUND_STATUSES);
+  }
+}
+
+const storageChangeEmitter =
+  typeof browser !== "undefined" && browser?.storage?.onChanged
+    ? browser.storage.onChanged
+    : typeof chrome !== "undefined" && chrome?.storage?.onChanged
+      ? chrome.storage.onChanged
+      : null;
+
+if (storageChangeEmitter) {
+  storageChangeEmitter.addListener((changes, areaName) => {
+    if (areaName !== "local" || !changes) {
+      return;
+    }
+    const change = changes[SOUND_STATUS_STORAGE_KEY];
+    if (!change) {
+      return;
+    }
+    const sanitized = sanitizeSoundStatuses(change.newValue);
+    if (sanitized !== null) {
+      updateSoundEnabledStatuses(sanitized);
+    } else {
+      updateSoundEnabledStatuses(DEFAULT_SOUND_STATUSES);
+    }
+  });
+}
 
 function ensureAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -385,14 +489,14 @@ function renderHistory(history) {
     if (task?.id) {
       nextStatuses.set(task.id, statusKey);
       const previousStatus = lastKnownTaskStatuses.get(task.id);
-      const wasPreviouslyCompleted =
+      const wasPreviouslySoundEligible =
         previousStatus !== undefined &&
-        COMPLETED_STATUS_KEYS.has(previousStatus);
+        soundEnabledStatuses.has(previousStatus);
 
       if (
         hasRenderedHistory &&
-        COMPLETED_STATUS_KEYS.has(statusKey) &&
-        !wasPreviouslyCompleted
+        soundEnabledStatuses.has(statusKey) &&
+        !wasPreviouslySoundEligible
       ) {
         shouldPlayCompletionSound = true;
       }
@@ -515,5 +619,11 @@ refreshButton?.addEventListener("click", () => {
 openSettingsButton?.addEventListener("click", handleOpenSettingsClick);
 
 window.addEventListener("DOMContentLoaded", () => {
-  loadHistory();
+  loadSoundPreferences()
+    .catch((error) => {
+      console.error("Failed to prepare sound preferences", error);
+    })
+    .finally(() => {
+      loadHistory();
+    });
 });
