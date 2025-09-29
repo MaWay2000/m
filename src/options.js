@@ -12,6 +12,29 @@ const SHOW_BROWSER_ACTION_ICON_KEY = "codexShowBrowserActionIcon";
 const toggle = document.getElementById("toolbar-icon-toggle");
 const statusOutput = document.getElementById("status");
 
+function sendRuntimeMessage(message) {
+  if (!runtime?.sendMessage) {
+    return Promise.resolve();
+  }
+  try {
+    const result = runtime.sendMessage(message);
+    if (result && typeof result.then === "function") {
+      return result;
+    }
+  } catch (error) {
+    console.error("Failed to send runtime message", error);
+  }
+  return new Promise((resolve, reject) => {
+    runtime.sendMessage(message, (response) => {
+      if (runtime?.lastError) {
+        reject(new Error(runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
 function storageGet(key) {
   if (!storage?.local) {
     return Promise.resolve(undefined);
@@ -95,14 +118,23 @@ async function handleToggleChange() {
     return;
   }
   const nextValue = toggle.checked;
+  const previousValue = !nextValue;
   toggle.disabled = true;
   showStatus("Saving…");
   try {
     await storageSet(SHOW_BROWSER_ACTION_ICON_KEY, nextValue);
+    try {
+      await sendRuntimeMessage({
+        type: "set-toolbar-visibility",
+        shouldShow: nextValue,
+      });
+    } catch (error) {
+      console.error("Failed to apply toolbar visibility immediately", error);
+    }
     showStatus("Saved.");
   } catch (error) {
     console.error("Failed to update toolbar visibility", error);
-    toggle.checked = !nextValue;
+    toggle.checked = previousValue;
     showStatus(`Unable to save: ${error.message}`, { isError: true });
   } finally {
     toggle.disabled = false;

@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.14 - 2025-09-28
+- Allow the toolbar icon to unpin immediately when the options toggle is unchecked.
+
 # 1.1.13 - 2025-09-28
 - Removed the smart check action from the popup and background services.
 
