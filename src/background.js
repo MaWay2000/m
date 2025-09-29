@@ -725,6 +725,18 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "set-toolbar-visibility") {
+    const shouldShow = message?.shouldShow !== false;
+    setBrowserActionVisibility(shouldShow).then(
+      () => sendResponse?.({ type: "ack" }),
+      (error) => {
+        console.error("Failed to set toolbar visibility", error);
+        sendResponse?.({ type: "error", message: String(error) });
+      },
+    );
+    return true;
+  }
+
   return false;
 });
 
