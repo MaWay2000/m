@@ -29,6 +29,10 @@
       "48": "src/icons/icon-48.png"
     }
   },
+  "options_ui": {
+    "page": "src/options.html",
+    "open_in_tab": true
+  },
   "background": {
     "scripts": ["src/background.js"],
     "persistent": false

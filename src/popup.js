@@ -1,8 +1,21 @@
+const runtime =
+  typeof browser !== "undefined" && browser?.runtime
+    ? browser.runtime
+    : chrome?.runtime;
+const storage =
+  typeof browser !== "undefined" && browser?.storage
+    ? browser.storage
+    : chrome?.storage;
+
+const SHOW_BROWSER_ACTION_ICON_KEY = "codexShowBrowserActionIcon";
+
 const refreshButton = document.getElementById("refresh");
 const historyList = document.getElementById("history");
 const emptyState = document.getElementById("empty-state");
 const errorOutput = document.getElementById("error");
 const countBadge = document.getElementById("history-count");
+const toolbarIconToggle = document.getElementById("toolbar-icon-toggle");
+const openSettingsButton = document.getElementById("open-settings");
 
 const autoCreatePrTasks = new Set();
 let autoCreatePrQueue = Promise.resolve();
@@ -98,6 +111,90 @@ function sendMessage(message) {
     });
   }
   return Promise.reject(new Error("Runtime messaging is unavailable."));
+}
+
+function storageGetValue(key) {
+  if (!storage?.local) {
+    return Promise.resolve(undefined);
+  }
+  try {
+    const result = storage.local.get(key);
+    if (result && typeof result.then === "function") {
+      return result.then((data) => data?.[key]);
+    }
+  } catch (error) {
+    console.error("Failed to get popup storage value", error);
+  }
+  return new Promise((resolve) => {
+    storage.local.get(key, (data) => {
+      if (runtime?.lastError) {
+        console.error("Popup storage get error", runtime.lastError);
+        resolve(undefined);
+        return;
+      }
+      resolve(data?.[key]);
+    });
+  });
+}
+
+function storageSetValue(key, value) {
+  if (!storage?.local) {
+    return Promise.resolve();
+  }
+  const payload = { [key]: value };
+  try {
+    const result = storage.local.set(payload);
+    if (result && typeof result.then === "function") {
+      return result;
+    }
+  } catch (error) {
+    console.error("Failed to update popup storage value", error);
+  }
+  return new Promise((resolve, reject) => {
+    storage.local.set(payload, () => {
+      if (runtime?.lastError) {
+        reject(new Error(runtime.lastError.message));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+function openOptionsPage() {
+  if (typeof browser !== "undefined" && browser?.runtime?.openOptionsPage) {
+    try {
+      const result = browser.runtime.openOptionsPage();
+      if (result && typeof result.then === "function") {
+        return result;
+      }
+      return Promise.resolve();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+  if (typeof chrome !== "undefined" && chrome?.runtime?.openOptionsPage) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.openOptionsPage(() => {
+          const error = chrome.runtime?.lastError;
+          if (error) {
+            reject(new Error(error.message));
+            return;
+          }
+          resolve();
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+  const url = runtime?.getURL ? runtime.getURL("src/options.html") : null;
+  if (url) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return Promise.resolve();
+  }
+  return Promise.reject(new Error("Options page is unavailable."));
 }
 
 function formatTimestamp(timestamp) {
@@ -446,6 +543,59 @@ async function loadHistory() {
   }
 }
 
+async function initializeToolbarIconToggle() {
+  if (!toolbarIconToggle) {
+    return;
+  }
+
+  toolbarIconToggle.disabled = true;
+  try {
+    const stored = await storageGetValue(SHOW_BROWSER_ACTION_ICON_KEY);
+    toolbarIconToggle.checked = stored !== false;
+  } catch (error) {
+    console.error("Failed to load toolbar visibility setting", error);
+    if (errorOutput) {
+      errorOutput.textContent = `Unable to load settings: ${error.message}`;
+    }
+  } finally {
+    toolbarIconToggle.disabled = false;
+  }
+
+  toolbarIconToggle.addEventListener("change", async () => {
+    const desiredState = toolbarIconToggle.checked;
+    toolbarIconToggle.disabled = true;
+    try {
+      await storageSetValue(SHOW_BROWSER_ACTION_ICON_KEY, desiredState);
+    } catch (error) {
+      console.error("Failed to update toolbar visibility setting", error);
+      if (errorOutput) {
+        errorOutput.textContent = `Unable to update setting: ${error.message}`;
+      }
+      toolbarIconToggle.checked = !desiredState;
+    } finally {
+      toolbarIconToggle.disabled = false;
+    }
+  });
+}
+
+function handleOpenSettingsClick(event) {
+  event?.preventDefault();
+  if (!openSettingsButton) {
+    return;
+  }
+  openSettingsButton.disabled = true;
+  openOptionsPage()
+    .catch((error) => {
+      console.error("Failed to open extension settings", error);
+      if (errorOutput) {
+        errorOutput.textContent = `Unable to open settings: ${error.message}`;
+      }
+    })
+    .finally(() => {
+      openSettingsButton.disabled = false;
+    });
+}
+
 refreshButton?.addEventListener("click", () => {
   refreshButton.disabled = true;
   loadHistory().finally(() => {
@@ -453,6 +603,9 @@ refreshButton?.addEventListener("click", () => {
   });
 });
 
+openSettingsButton?.addEventListener("click", handleOpenSettingsClick);
+
 window.addEventListener("DOMContentLoaded", () => {
   loadHistory();
+  initializeToolbarIconToggle();
 });
