@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.16 - 2025-09-28
+- Renamed the Ready status label across the extension to **Task ready to view** so notifications and settings reflect the new wording.
+
 # 1.1.15 - 2025-09-28
 - Added notification sound preferences to the settings page so you can choose which task statuses play audio alerts.
 
