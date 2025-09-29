@@ -5,9 +5,27 @@ const storageApi =
       ? chrome.storage
       : null;
 
+const SOUND_STATUSES = ["ready", "pr-created", "merged"];
 const SOUND_STATUS_STORAGE_KEY = "codexSoundStatuses";
+const SOUND_SELECTION_STORAGE_KEY = "codexSoundSelections";
 const DEFAULT_SOUND_STATUSES = ["ready", "merged"];
-const SOUND_STATUS_VALUES = new Set(["ready", "pr-created", "merged"]);
+const DEFAULT_SOUND_SELECTIONS = {
+  ready: "1.mp3",
+  "pr-created": "1.mp3",
+  merged: "1.mp3",
+};
+const SOUND_STATUS_VALUES = new Set(SOUND_STATUSES);
+const SOUND_FILE_OPTIONS = [
+  "1.mp3",
+  "2.mp3",
+  "3.mp3",
+  "4.mp3",
+  "5.mp3",
+  "6.mp3",
+  "7.mp3",
+  "8.mp3",
+];
+const SOUND_FILE_VALUES = new Set(SOUND_FILE_OPTIONS);
 
 function storageGet(key) {
   if (!storageApi?.local) {
@@ -94,6 +112,41 @@ function sanitizeSoundStatuses(value) {
   return sanitized;
 }
 
+function sanitizeSoundSelections(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const sanitized = {};
+  for (const status of SOUND_STATUSES) {
+    const rawValue = value?.[status];
+    if (typeof rawValue !== "string") {
+      continue;
+    }
+    const normalized = rawValue.trim();
+    if (!normalized || !SOUND_FILE_VALUES.has(normalized)) {
+      continue;
+    }
+    sanitized[status] = normalized;
+  }
+  return sanitized;
+}
+
+function updateSoundSelectState(statuses) {
+  const form = document.getElementById("sound-preferences");
+  if (!form) {
+    return;
+  }
+  const enabled = new Set(statuses);
+  const selects = form.querySelectorAll('select[name="sound-selection"]');
+  for (const select of selects) {
+    const status = select.dataset?.status;
+    if (!status) {
+      continue;
+    }
+    select.disabled = !enabled.has(status);
+  }
+}
+
 function applyStatuses(statuses) {
   const form = document.getElementById("sound-preferences");
   if (!form) {
@@ -103,6 +156,27 @@ function applyStatuses(statuses) {
   const enabled = new Set(statuses);
   for (const input of checkboxes) {
     input.checked = enabled.has(input.value);
+  }
+  updateSoundSelectState(statuses);
+}
+
+function applySoundSelections(selections) {
+  const form = document.getElementById("sound-preferences");
+  if (!form) {
+    return;
+  }
+  const selects = form.querySelectorAll('select[name="sound-selection"]');
+  for (const select of selects) {
+    const status = select.dataset?.status;
+    if (!status) {
+      continue;
+    }
+    const desired = selections?.[status] ?? DEFAULT_SOUND_SELECTIONS[status];
+    if (desired && SOUND_FILE_VALUES.has(desired)) {
+      select.value = desired;
+    } else {
+      select.value = DEFAULT_SOUND_SELECTIONS[status];
+    }
   }
 }
 
@@ -121,13 +195,22 @@ function showStatusMessage(message, isError = false) {
 
 async function loadSoundPreferences() {
   try {
-    const stored = await storageGet(SOUND_STATUS_STORAGE_KEY);
-    const sanitized = sanitizeSoundStatuses(stored);
-    const statuses = sanitized !== null ? sanitized : DEFAULT_SOUND_STATUSES;
+    const [storedStatuses, storedSelections] = await Promise.all([
+      storageGet(SOUND_STATUS_STORAGE_KEY),
+      storageGet(SOUND_SELECTION_STORAGE_KEY),
+    ]);
+    const sanitizedStatuses = sanitizeSoundStatuses(storedStatuses);
+    const statuses =
+      sanitizedStatuses !== null ? sanitizedStatuses : DEFAULT_SOUND_STATUSES;
     applyStatuses(statuses);
+
+    const sanitizedSelections = sanitizeSoundSelections(storedSelections);
+    const selections = { ...DEFAULT_SOUND_SELECTIONS, ...(sanitizedSelections ?? {}) };
+    applySoundSelections(selections);
   } catch (error) {
     console.error("Unable to load sound preferences", error);
     applyStatuses(DEFAULT_SOUND_STATUSES);
+    applySoundSelections(DEFAULT_SOUND_SELECTIONS);
     showStatusMessage(`Unable to load preferences: ${error.message}`, true);
   }
 }
@@ -145,22 +228,61 @@ function readSelectedStatuses() {
   return selected;
 }
 
+function readSoundSelections() {
+  const form = document.getElementById("sound-preferences");
+  if (!form) {
+    return {};
+  }
+  const selections = {};
+  const selects = form.querySelectorAll('select[name="sound-selection"]');
+  for (const select of selects) {
+    const status = select.dataset?.status;
+    if (!status) {
+      continue;
+    }
+    selections[status] = select.value;
+  }
+  return selections;
+}
+
 async function handlePreferencesChange(event) {
-  if (!event?.target || !(event.target instanceof HTMLInputElement)) {
+  const target = event?.target;
+  if (!target) {
     return;
   }
-  const selected = readSelectedStatuses();
-  const sanitized = sanitizeSoundStatuses(selected) ?? [];
-  try {
-    await storageSet(SOUND_STATUS_STORAGE_KEY, sanitized);
-    if (sanitized.length) {
-      showStatusMessage("Preferences saved.");
-    } else {
-      showStatusMessage("Notification sounds are disabled.");
+
+  if (target instanceof HTMLInputElement && target.name === "sound-status") {
+    const selected = readSelectedStatuses();
+    const sanitized = sanitizeSoundStatuses(selected) ?? [];
+    try {
+      await storageSet(SOUND_STATUS_STORAGE_KEY, sanitized);
+      updateSoundSelectState(sanitized);
+      if (sanitized.length) {
+        showStatusMessage("Preferences saved.");
+      } else {
+        showStatusMessage("Notification sounds are disabled.");
+      }
+    } catch (error) {
+      console.error("Unable to save sound preferences", error);
+      showStatusMessage(`Unable to save preferences: ${error.message}`, true);
     }
-  } catch (error) {
-    console.error("Unable to save sound preferences", error);
-    showStatusMessage(`Unable to save preferences: ${error.message}`, true);
+    return;
+  }
+
+  if (target instanceof HTMLSelectElement && target.name === "sound-selection") {
+    const selectedSounds = readSoundSelections();
+    const sanitized = sanitizeSoundSelections(selectedSounds);
+    const selectionsToStore = {
+      ...DEFAULT_SOUND_SELECTIONS,
+      ...(sanitized ?? {}),
+    };
+    try {
+      await storageSet(SOUND_SELECTION_STORAGE_KEY, selectionsToStore);
+      showStatusMessage("Sound choice saved.");
+    } catch (error) {
+      console.error("Unable to save sound selection", error);
+      showStatusMessage(`Unable to save preferences: ${error.message}`, true);
+    }
   }
 }
 
