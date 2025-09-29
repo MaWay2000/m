@@ -4,11 +4,9 @@ import {
   getSettings,
   normalizeSettings,
   setSoundNotificationsEnabled,
-  setPinReminderEnabled,
 } from "./settings.js";
 
 const soundToggle = document.getElementById("sound-enabled");
-const pinReminderToggle = document.getElementById("pin-reminder-enabled");
 const statusOutput = document.getElementById("options-status");
 
 let isInitializing = true;
@@ -43,9 +41,6 @@ function updateForm(settings) {
   if (soundToggle) {
     soundToggle.checked = normalized.soundNotifications.enabled !== false;
   }
-  if (pinReminderToggle) {
-    pinReminderToggle.checked = normalized.pinReminder.enabled !== false;
-  }
 }
 
 async function loadSettingsIntoForm() {
@@ -77,24 +72,7 @@ async function handleSoundToggleChange() {
   }
 }
 
-async function handlePinReminderToggleChange() {
-  if (isInitializing || !pinReminderToggle) {
-    return;
-  }
-  const enabled = pinReminderToggle.checked;
-  setStatus("Saving preferences…");
-  try {
-    await setPinReminderEnabled(enabled);
-    setStatus("Preferences saved.");
-  } catch (error) {
-    console.error("Failed to save pin reminder setting", error);
-    setStatus(`Unable to save changes: ${error.message}`, { isError: true });
-    pinReminderToggle.checked = !enabled;
-  }
-}
-
 soundToggle?.addEventListener("change", handleSoundToggleChange);
-pinReminderToggle?.addEventListener("change", handlePinReminderToggleChange);
 
 document.addEventListener("DOMContentLoaded", () => {
   loadSettingsIntoForm();
