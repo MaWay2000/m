@@ -64,31 +64,29 @@ function playNotificationSound(kind = "default") {
   }
 
   const now = context.currentTime;
-
-  const pattern =
-    kind === "completion"
-      ? [
-          { offset: 0, frequency: 880 },
-          { offset: 0.28, frequency: 1040 },
-        ]
-      : [{ offset: 0, frequency: 720 }];
+  const pattern = [{ offset: 0 }];
+  const envelopeDuration = 1;
+  const frequencies = [440, 660];
 
   for (const tone of pattern) {
-    const oscillator = context.createOscillator();
+    const startTime = now + tone.offset;
     const gainNode = context.createGain();
 
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(tone.frequency, now + tone.offset);
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    gainNode.gain.linearRampToValueAtTime(0.5, startTime + 0.03);
+    gainNode.gain.linearRampToValueAtTime(0.42, startTime + 0.15);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + envelopeDuration);
 
-    gainNode.gain.setValueAtTime(0.0001, now + tone.offset);
-    gainNode.gain.exponentialRampToValueAtTime(0.18, now + tone.offset + 0.01);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + tone.offset + 0.32);
-
-    oscillator.connect(gainNode);
     gainNode.connect(context.destination);
 
-    oscillator.start(now + tone.offset);
-    oscillator.stop(now + tone.offset + 0.36);
+    for (const frequency of frequencies) {
+      const oscillator = context.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+      oscillator.connect(gainNode);
+      oscillator.start(startTime);
+      oscillator.stop(startTime + envelopeDuration);
+    }
   }
 }
 
