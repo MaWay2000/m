@@ -26,6 +26,19 @@ When a tracked task leaves the "working" state, the popup now highlights it as *
 
 The extension remains installed until you restart Firefox. Repeat the steps above to load it again after restarting the browser.
 
+## Testing
+
+This project does not include automated tests. You can still verify the extension setup by running `web-ext lint` from the
+repository root. The command requires the [`web-ext`](https://extensionworkshop.com/documentation/develop/web-ext-command-reference/)
+CLI, which is available through npm:
+
+```bash
+npm install --global web-ext
+web-ext lint
+```
+
+Linting helps catch manifest or script issues before manually loading the extension in Firefox.
+
 ## Project update rules
 
 To keep the project history consistent:
