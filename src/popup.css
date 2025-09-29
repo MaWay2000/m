@@ -29,6 +29,13 @@ main {
   margin: 0;
 }
 
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
 .description {
   margin: 0;
   color: #475569;
@@ -49,6 +56,16 @@ button {
 
 button:hover:not(:disabled) {
   background: #2563eb;
+}
+
+.secondary {
+  border-color: #cbd5f5;
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
+.secondary:hover:not(:disabled) {
+  background: #cbd5f5;
 }
 
 button:disabled {
