@@ -4,12 +4,18 @@ export const DEFAULT_SETTINGS = Object.freeze({
   soundNotifications: {
     enabled: true,
   },
+  toolbarIcon: {
+    visible: true,
+  },
 });
 
 function cloneDefaultSettings() {
   return {
     soundNotifications: {
       enabled: DEFAULT_SETTINGS.soundNotifications.enabled,
+    },
+    toolbarIcon: {
+      visible: DEFAULT_SETTINGS.toolbarIcon.visible,
     },
   };
 }
@@ -96,6 +102,16 @@ export function normalizeSettings(rawValue = {}) {
         rawValue.playSoundNotifications,
       );
     }
+
+    const rawToolbar = rawValue.toolbarIcon;
+    if (rawToolbar && typeof rawToolbar === "object") {
+      if (rawToolbar.visible !== undefined) {
+        normalized.toolbarIcon.visible = Boolean(rawToolbar.visible);
+      }
+    } else if (rawValue.showToolbarIcon !== undefined) {
+      // Support a potential legacy flag name.
+      normalized.toolbarIcon.visible = Boolean(rawValue.showToolbarIcon);
+    }
   }
 
   return normalized;
@@ -129,6 +145,10 @@ export async function saveSettings(partialSettings) {
       ...current.soundNotifications,
       ...(partialSettings?.soundNotifications || {}),
     },
+    toolbarIcon: {
+      ...current.toolbarIcon,
+      ...(partialSettings?.toolbarIcon || {}),
+    },
   });
   return writeSettings(next);
 }
@@ -137,6 +157,14 @@ export async function setSoundNotificationsEnabled(enabled) {
   return saveSettings({
     soundNotifications: {
       enabled: Boolean(enabled),
+    },
+  });
+}
+
+export async function setToolbarIconVisibility(visible) {
+  return saveSettings({
+    toolbarIcon: {
+      visible: Boolean(visible),
     },
   });
 }
