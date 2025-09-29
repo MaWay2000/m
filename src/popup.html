@@ -9,7 +9,12 @@
     <main>
       <header class="banner">
         <h1>codex-autorun</h1>
-        <button id="refresh" type="button" title="Refresh history">Refresh</button>
+        <div class="banner-actions">
+          <button id="refresh" type="button" title="Refresh history">Refresh</button>
+          <button id="open-settings" type="button" title="Open extension settings">
+            Settings
+          </button>
+        </div>
       </header>
       <p class="description">
         Monitoring for Codex tasks that show the working indicator square.
@@ -21,21 +26,6 @@
         </div>
         <p id="empty-state" class="empty">No tasks detected yet.</p>
         <ol id="history" class="history-list"></ol>
-      </section>
-      <section class="settings" aria-labelledby="settings-title">
-        <div class="settings-heading">
-          <h2 id="settings-title">Settings</h2>
-          <button id="open-settings" type="button" class="settings-open">
-            Open full settings
-          </button>
-        </div>
-        <label class="settings-toggle">
-          <input type="checkbox" id="toolbar-icon-toggle" />
-          <span>Show icon in the browser menu bar</span>
-        </label>
-        <p class="settings-note">
-          Hiding the icon moves controls to the extension's settings page.
-        </p>
       </section>
       <output id="error" role="status" aria-live="polite"></output>
     </main>
