@@ -4,9 +4,11 @@ import {
   getSettings,
   normalizeSettings,
   setSoundNotificationsEnabled,
+  setToolbarIconVisibility,
 } from "./settings.js";
 
 const soundToggle = document.getElementById("sound-enabled");
+const toolbarIconToggle = document.getElementById("toolbar-icon-visible");
 const statusOutput = document.getElementById("options-status");
 
 let isInitializing = true;
@@ -41,6 +43,9 @@ function updateForm(settings) {
   if (soundToggle) {
     soundToggle.checked = normalized.soundNotifications.enabled !== false;
   }
+  if (toolbarIconToggle) {
+    toolbarIconToggle.checked = normalized.toolbarIcon.visible !== false;
+  }
 }
 
 async function loadSettingsIntoForm() {
@@ -72,7 +77,24 @@ async function handleSoundToggleChange() {
   }
 }
 
+async function handleToolbarIconToggleChange() {
+  if (isInitializing || !toolbarIconToggle) {
+    return;
+  }
+  const visible = toolbarIconToggle.checked;
+  setStatus("Saving preferences…");
+  try {
+    await setToolbarIconVisibility(visible);
+    setStatus("Preferences saved.");
+  } catch (error) {
+    console.error("Failed to save toolbar icon setting", error);
+    setStatus(`Unable to save changes: ${error.message}`, { isError: true });
+    toolbarIconToggle.checked = !visible;
+  }
+}
+
 soundToggle?.addEventListener("change", handleSoundToggleChange);
+toolbarIconToggle?.addEventListener("change", handleToolbarIconToggleChange);
 
 document.addEventListener("DOMContentLoaded", () => {
   loadSettingsIntoForm();
