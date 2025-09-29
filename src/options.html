@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>codex-autorun settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="options">
+      <header class="options__header">
+        <h1>codex-autorun settings</h1>
+        <p>Manage notification preferences for the extension.</p>
+      </header>
+      <section class="options__section" aria-labelledby="sound-settings-heading">
+        <div class="section-heading">
+          <h2 id="sound-settings-heading">Sound notifications</h2>
+          <p class="section-description">
+            Control whether the extension plays notification tones when tasks
+            update.
+          </p>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="sound-enabled" />
+          <span class="toggle__label">Play notification sounds</span>
+        </label>
+        <p class="hint">
+          When disabled, codex-autorun will remain silent while still updating
+          your task history.
+        </p>
+      </section>
+      <output
+        id="options-status"
+        class="options__status"
+        role="status"
+        aria-live="polite"
+      ></output>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
