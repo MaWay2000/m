@@ -14,7 +14,7 @@ const countBadge = document.getElementById("history-count");
 const autoCreatePrTasks = new Set();
 let autoCreatePrQueue = Promise.resolve();
 const lastKnownTaskStatuses = new Map();
-const COMPLETED_STATUS_KEYS = new Set(["ready", "merged", "pr-created"]);
+const COMPLETED_STATUS_KEYS = new Set(["ready", "merged"]);
 
 let hasRenderedHistory = false;
 let audioContext;
