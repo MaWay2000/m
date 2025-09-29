@@ -1,11 +1,4 @@
-import {
-  addSettingsChangeListener,
-  getSettings,
-  normalizeSettings,
-} from "./settings.js";
-
 const refreshButton = document.getElementById("refresh");
-const optionsButton = document.getElementById("open-options");
 const historyList = document.getElementById("history");
 const emptyState = document.getElementById("empty-state");
 const errorOutput = document.getElementById("error");
@@ -19,22 +12,10 @@ const COMPLETED_STATUS_KEYS = new Set(["ready", "merged"]);
 let hasRenderedHistory = false;
 let audioContext;
 let userHasInteracted = false;
-let currentSettings = normalizeSettings();
-
-function applySettings(nextSettings) {
-  currentSettings = normalizeSettings(nextSettings);
-}
-
-function shouldPlaySounds() {
-  return currentSettings?.soundNotifications?.enabled !== false;
-}
 
 function ensureAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) {
-    return null;
-  }
-  if (!shouldPlaySounds()) {
     return null;
   }
   if (!audioContext || audioContext.state === "closed") {
@@ -55,9 +36,6 @@ function ensureAudioContext() {
 }
 
 function playNotificationSound(kind = "default") {
-  if (!shouldPlaySounds()) {
-    return;
-  }
   const context = ensureAudioContext();
   if (!context) {
     return;
@@ -96,9 +74,7 @@ window.addEventListener(
   "pointerdown",
   () => {
     userHasInteracted = true;
-    if (shouldPlaySounds()) {
-      ensureAudioContext();
-    }
+    ensureAudioContext();
   },
   { once: true, capture: true },
 );
@@ -477,39 +453,6 @@ refreshButton?.addEventListener("click", () => {
   });
 });
 
-optionsButton?.addEventListener("click", () => {
-  try {
-    if (typeof browser !== "undefined" && browser?.runtime?.openOptionsPage) {
-      browser.runtime.openOptionsPage();
-      return;
-    }
-    if (typeof chrome !== "undefined" && chrome?.runtime?.openOptionsPage) {
-      chrome.runtime.openOptionsPage();
-      return;
-    }
-  } catch (error) {
-    console.error("Failed to open options page", error);
-  }
-  if (typeof browser !== "undefined" && browser?.runtime?.getURL) {
-    const url = browser.runtime.getURL("src/options.html");
-    window.open(url, "_blank", "noopener,noreferrer");
-    return;
-  }
-  if (typeof chrome !== "undefined" && chrome?.runtime?.getURL) {
-    const url = chrome.runtime.getURL("src/options.html");
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-});
-
 window.addEventListener("DOMContentLoaded", () => {
   loadHistory();
-  getSettings()
-    .then(applySettings)
-    .catch((error) => {
-      console.error("Failed to load settings", error);
-    });
-});
-
-addSettingsChangeListener((settings) => {
-  applySettings(settings);
 });

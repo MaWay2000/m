@@ -1,8 +1,5 @@
 # Changelog
 
-# 1.1.14 - 2025-09-28
-- Restore the SVG toolbar icons in the manifest so the codex-autorun button reappears in the menu bar.
-
 # 1.1.13 - 2025-09-28
 - Removed the smart check action from the popup and background services.
 

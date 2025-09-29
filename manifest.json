@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "codex-autorun",
-  "version": "1.1.14",
+  "version": "1.1.13",
   "description": "The codex-autorun WebExtension with background script and popup.",
   "permissions": [
     "storage",
@@ -28,10 +28,6 @@
       "38": "src/icons/icon-38.png",
       "48": "src/icons/icon-48.png"
     }
-  },
-  "options_ui": {
-    "page": "src/options.html",
-    "open_in_tab": false
   },
   "background": {
     "scripts": ["src/background.js"],

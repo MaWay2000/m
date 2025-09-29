@@ -15,82 +15,6 @@ const autoProcessingTasks = new Set();
 
 const HISTORY_KEY = "codexTaskHistory";
 const CLOSED_TASKS_KEY = "codexClosedTaskIds";
-const SETTINGS_KEY = "codexSettings";
-
-function resolveActionApi() {
-  try {
-    if (typeof browser !== "undefined") {
-      if (browser?.browserAction) {
-        return browser.browserAction;
-      }
-      if (browser?.action) {
-        return browser.action;
-      }
-    }
-    if (typeof chrome !== "undefined") {
-      if (chrome?.browserAction) {
-        return chrome.browserAction;
-      }
-      if (chrome?.action) {
-        return chrome.action;
-      }
-    }
-  } catch (error) {
-    console.error("Failed to resolve toolbar action API", error);
-  }
-  return null;
-}
-
-const toolbarActionApi = resolveActionApi();
-let toolbarIconVisible = true;
-
-function isToolbarIconVisible(settings) {
-  if (!settings || typeof settings !== "object") {
-    return true;
-  }
-  const toolbar = settings.toolbarIcon;
-  if (toolbar && typeof toolbar === "object" && toolbar.visible !== undefined) {
-    return Boolean(toolbar.visible);
-  }
-  if (settings.showToolbarIcon !== undefined) {
-    return Boolean(settings.showToolbarIcon);
-  }
-  return true;
-}
-
-function updateToolbarIconVisibility(shouldShow) {
-  if (!toolbarActionApi) {
-    return;
-  }
-  const desiredState = shouldShow !== false;
-  if (toolbarIconVisible === desiredState) {
-    return;
-  }
-  toolbarIconVisible = desiredState;
-  try {
-    if (desiredState) {
-      if (typeof toolbarActionApi.enable === "function") {
-        toolbarActionApi.enable();
-      }
-    } else if (typeof toolbarActionApi.disable === "function") {
-      toolbarActionApi.disable();
-    }
-  } catch (error) {
-    console.error("Failed to update toolbar icon visibility", error);
-  }
-}
-
-async function initializeToolbarIconVisibility() {
-  if (!toolbarActionApi) {
-    return;
-  }
-  try {
-    const settings = await storageGet(SETTINGS_KEY);
-    updateToolbarIconVisibility(isToolbarIconVisible(settings));
-  } catch (error) {
-    console.error("Failed to apply toolbar icon preference", error);
-  }
-}
 
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -196,30 +120,6 @@ console.log("codex-autorun background service worker loaded.");
 runtime.onInstalled.addListener(() => {
   console.log("codex-autorun installed and ready.");
 });
-
-initializeToolbarIconVisibility();
-
-if (storage?.onChanged?.addListener) {
-  storage.onChanged.addListener((changes, areaName) => {
-    try {
-      const area = areaName ?? (changes?.areaName ?? "local");
-      if (area !== "local") {
-        return;
-      }
-      const change = changes?.[SETTINGS_KEY];
-      if (!change) {
-        return;
-      }
-      const value =
-        Object.prototype.hasOwnProperty.call(change, "newValue")
-          ? change.newValue
-          : change;
-      updateToolbarIconVisibility(isToolbarIconVisible(value));
-    } catch (error) {
-      console.error("Failed to react to toolbar icon preference change", error);
-    }
-  });
-}
 
 function storageGet(key) {
   if (!storage?.local) {
