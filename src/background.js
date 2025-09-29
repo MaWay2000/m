@@ -15,6 +15,7 @@ const autoProcessingTasks = new Set();
 
 const HISTORY_KEY = "codexTaskHistory";
 const CLOSED_TASKS_KEY = "codexClosedTaskIds";
+const PIN_REMINDER_DISMISSED_KEY = "codexPinReminderDismissed";
 
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -117,9 +118,67 @@ async function markTaskClosed(taskId) {
 }
 
 console.log("codex-autorun background service worker loaded.");
-runtime.onInstalled.addListener(() => {
-  console.log("codex-autorun installed and ready.");
+runtime.onInstalled.addListener(async (details) => {
+  console.log("codex-autorun installed and ready.", details);
+
+  const reason = details?.reason;
+  if (reason !== "install" && reason !== "update") {
+    return;
+  }
+
+  try {
+    const dismissed = await storageGet(PIN_REMINDER_DISMISSED_KEY);
+    if (dismissed) {
+      return;
+    }
+  } catch (error) {
+    console.error("Failed to read pin reminder preference", error);
+    return;
+  }
+
+  await openPinReminderPage();
 });
+
+function openPinReminderPage() {
+  if (!runtime?.getURL) {
+    return Promise.resolve();
+  }
+
+  const url = runtime.getURL("src/pinReminder.html");
+  if (!url) {
+    return Promise.resolve();
+  }
+
+  if (tabs?.create) {
+    try {
+      const result = tabs.create({ url });
+      if (result && typeof result.then === "function") {
+        return result.catch((error) => {
+          console.error(
+            "Failed to open the codex-autorun pin reminder",
+            error
+          );
+        });
+      }
+    } catch (error) {
+      console.error("Failed to open the codex-autorun pin reminder", error);
+    }
+    return Promise.resolve();
+  }
+
+  if (runtime?.openOptionsPage) {
+    try {
+      runtime.openOptionsPage();
+    } catch (error) {
+      console.error(
+        "Failed to open extension options for the pin reminder",
+        error
+      );
+    }
+  }
+
+  return Promise.resolve();
+}
 
 function storageGet(key) {
   if (!storage?.local) {
