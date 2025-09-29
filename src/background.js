@@ -279,6 +279,48 @@ function normalizeActionResult(result) {
   return Promise.resolve();
 }
 
+async function clearBrowserActionIcon(action) {
+  const attempts = [
+    {
+      createDetails: () => ({ path: {} }),
+      debugMessage: "Failed to clear browser action icon using empty path",
+    },
+    {
+      createDetails: () => ({ imageData: {} }),
+      debugMessage: "Failed to clear browser action icon using empty imageData",
+    },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const result = action.setIcon(attempt.createDetails());
+      if (result && typeof result.then === "function") {
+        await result;
+      }
+      return true;
+    } catch (error) {
+      console.debug(attempt.debugMessage, error);
+    }
+  }
+
+  const transparentIcons = getTransparentBrowserActionIcons();
+  if (!transparentIcons) {
+    return false;
+  }
+
+  try {
+    const result = action.setIcon({ imageData: transparentIcons });
+    if (result && typeof result.then === "function") {
+      await result;
+    }
+    return true;
+  } catch (error) {
+    console.debug("Failed to apply transparent browser action icon", error);
+  }
+
+  return false;
+}
+
 async function setBrowserActionVisibility(shouldShow) {
   const action = getBrowserActionApi();
   if (!action) {
@@ -314,12 +356,7 @@ async function setBrowserActionVisibility(shouldShow) {
     }
   } else {
     if (typeof action.setIcon === "function") {
-      const transparentIcons = getTransparentBrowserActionIcons();
-      if (transparentIcons) {
-        tasks.push(
-          normalizeActionResult(action.setIcon({ imageData: transparentIcons })),
-        );
-      }
+      tasks.push(clearBrowserActionIcon(action));
     }
     if (typeof action.setTitle === "function") {
       tasks.push(normalizeActionResult(action.setTitle({ title: "" })));
