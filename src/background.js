@@ -270,6 +270,7 @@ async function showStatusNotification(task, statusKey) {
   try {
     const notificationId = await createNotification({
       type: "basic",
+      silent: true,
       iconUrl,
       title: `${statusLabel} task`,
       message,
