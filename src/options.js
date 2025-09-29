@@ -10,18 +10,11 @@ const STATUS_VALUES = new Set(STATUS_OPTIONS);
 const NOTIFICATION_STATUS_STORAGE_KEY = "codexNotificationStatuses";
 const NOTIFICATION_SOUND_SELECTION_STORAGE_KEY =
   "codexNotificationSoundSelections";
-const NOTIFICATION_SOUND_ENABLED_STORAGE_KEY =
-  "codexNotificationSoundEnabled";
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "pr-created"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   ready: "1.mp3",
   "pr-created": "1.mp3",
   merged: "1.mp3",
-};
-const DEFAULT_NOTIFICATION_SOUND_ENABLED = {
-  ready: true,
-  "pr-created": true,
-  merged: true,
 };
 const SOUND_FILE_OPTIONS = [
   "1.mp3",
@@ -34,8 +27,6 @@ const SOUND_FILE_OPTIONS = [
   "8.mp3",
 ];
 const SOUND_FILE_VALUES = new Set(SOUND_FILE_OPTIONS);
-let lastAppliedNotificationStatuses = new Set(DEFAULT_NOTIFICATION_STATUSES);
-let lastAppliedSoundEnabled = { ...DEFAULT_NOTIFICATION_SOUND_ENABLED };
 
 function storageGet(key) {
   if (!storageApi?.local) {
@@ -145,38 +136,6 @@ function sanitizeSoundSelections(value) {
   return sanitized;
 }
 
-function sanitizeSoundEnabledMap(value) {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const sanitized = {};
-
-  for (const status of STATUS_OPTIONS) {
-    const rawValue = value?.[status];
-    if (typeof rawValue === "boolean") {
-      sanitized[status] = rawValue;
-      continue;
-    }
-    if (typeof rawValue === "string") {
-      const normalized = rawValue.trim().toLowerCase();
-      if (normalized === "true" || normalized === "false") {
-        sanitized[status] = normalized === "true";
-      }
-      continue;
-    }
-    if (typeof rawValue === "number") {
-      if (rawValue === 1) {
-        sanitized[status] = true;
-      } else if (rawValue === 0) {
-        sanitized[status] = false;
-      }
-    }
-  }
-
-  return sanitized;
-}
-
 function applyNotificationStatuses(statuses) {
   const form = document.getElementById("notification-preferences");
   if (!form) {
@@ -186,13 +145,11 @@ function applyNotificationStatuses(statuses) {
   const checkboxes = form.querySelectorAll('input[name="notification-status"]');
   const enabled = new Set(statuses);
 
-  lastAppliedNotificationStatuses = new Set(enabled);
-
   for (const input of checkboxes) {
     input.checked = enabled.has(input.value);
   }
 
-  updateNotificationSoundControlState();
+  updateNotificationSoundSelectState(statuses);
 }
 
 function applyNotificationSoundSelections(selections) {
@@ -222,40 +179,13 @@ function applyNotificationSoundSelections(selections) {
   }
 }
 
-function applyNotificationSoundEnabled(enabledMap) {
+function updateNotificationSoundSelectState(statuses) {
   const form = document.getElementById("notification-preferences");
   if (!form) {
     return;
   }
 
-  lastAppliedSoundEnabled = {
-    ...DEFAULT_NOTIFICATION_SOUND_ENABLED,
-    ...(enabledMap ?? {}),
-  };
-
-  const toggles = form.querySelectorAll(
-    'input[name="notification-sound-enabled"]',
-  );
-
-  for (const toggle of toggles) {
-    const status = toggle.dataset?.status;
-    if (!status) {
-      continue;
-    }
-
-    const isEnabled = lastAppliedSoundEnabled[status];
-    toggle.checked = isEnabled !== false;
-  }
-
-  updateNotificationSoundControlState();
-}
-
-function updateNotificationSoundControlState() {
-  const form = document.getElementById("notification-preferences");
-  if (!form) {
-    return;
-  }
-
+  const enabled = new Set(statuses);
   const selects = form.querySelectorAll(
     'select[name="notification-sound-selection"]',
   );
@@ -266,22 +196,7 @@ function updateNotificationSoundControlState() {
       continue;
     }
 
-    const statusEnabled = lastAppliedNotificationStatuses.has(status);
-    const soundEnabled = lastAppliedSoundEnabled[status] !== false;
-    select.disabled = !statusEnabled || !soundEnabled;
-  }
-
-  const toggles = form.querySelectorAll(
-    'input[name="notification-sound-enabled"]',
-  );
-
-  for (const toggle of toggles) {
-    const status = toggle.dataset?.status;
-    if (!status) {
-      continue;
-    }
-
-    toggle.disabled = !lastAppliedNotificationStatuses.has(status);
+    select.disabled = !enabled.has(status);
   }
 }
 
@@ -301,12 +216,10 @@ function showNotificationStatusMessage(message, isError = false) {
 
 async function loadNotificationPreferences() {
   try {
-    const [storedStatuses, storedSelections, storedSoundEnabled] =
-      await Promise.all([
-        storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
-        storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
-        storageGet(NOTIFICATION_SOUND_ENABLED_STORAGE_KEY),
-      ]);
+    const [storedStatuses, storedSelections] = await Promise.all([
+      storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
+      storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
+    ]);
     const sanitizedStatuses = sanitizeNotificationStatuses(storedStatuses);
     const statuses =
       sanitizedStatuses !== null ? sanitizedStatuses : DEFAULT_NOTIFICATION_STATUSES;
@@ -319,19 +232,11 @@ async function loadNotificationPreferences() {
     };
     applyNotificationSoundSelections(selections);
 
-    const sanitizedSoundEnabled = sanitizeSoundEnabledMap(storedSoundEnabled);
-    const soundEnabled = {
-      ...DEFAULT_NOTIFICATION_SOUND_ENABLED,
-      ...(sanitizedSoundEnabled ?? {}),
-    };
-    applyNotificationSoundEnabled(soundEnabled);
-
     showNotificationStatusMessage("");
   } catch (error) {
     console.error("Unable to load notification preferences", error);
     applyNotificationStatuses(DEFAULT_NOTIFICATION_STATUSES);
     applyNotificationSoundSelections(DEFAULT_NOTIFICATION_SOUND_SELECTIONS);
-    applyNotificationSoundEnabled(DEFAULT_NOTIFICATION_SOUND_ENABLED);
     showNotificationStatusMessage(`Unable to load preferences: ${error.message}`, true);
   }
 }
@@ -377,29 +282,6 @@ function readNotificationSoundSelections() {
   return selections;
 }
 
-function readNotificationSoundEnabled() {
-  const form = document.getElementById("notification-preferences");
-  if (!form) {
-    return {};
-  }
-
-  const enabled = {};
-  const toggles = form.querySelectorAll(
-    'input[name="notification-sound-enabled"]',
-  );
-
-  for (const toggle of toggles) {
-    const status = toggle.dataset?.status;
-    if (!status) {
-      continue;
-    }
-
-    enabled[status] = toggle.checked;
-  }
-
-  return enabled;
-}
-
 async function handleNotificationPreferencesChange(event) {
   const target = event?.target;
   if (target instanceof HTMLInputElement && target.name === "notification-status") {
@@ -408,8 +290,7 @@ async function handleNotificationPreferencesChange(event) {
 
     try {
       await storageSet(NOTIFICATION_STATUS_STORAGE_KEY, sanitized);
-      lastAppliedNotificationStatuses = new Set(sanitized);
-      updateNotificationSoundControlState();
+      updateNotificationSoundSelectState(sanitized);
       if (sanitized.length) {
         showNotificationStatusMessage("Preferences saved.");
       } else {
@@ -440,29 +321,6 @@ async function handleNotificationPreferencesChange(event) {
       showNotificationStatusMessage("Sound choice saved.");
     } catch (error) {
       console.error("Unable to save notification sound selection", error);
-      showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
-    }
-    return;
-  }
-
-  if (
-    target instanceof HTMLInputElement &&
-    target.name === "notification-sound-enabled"
-  ) {
-    const soundEnabled = readNotificationSoundEnabled();
-    const sanitized = sanitizeSoundEnabledMap(soundEnabled) ?? {};
-    try {
-      await storageSet(
-        NOTIFICATION_SOUND_ENABLED_STORAGE_KEY,
-        sanitized,
-      );
-      applyNotificationSoundEnabled({
-        ...DEFAULT_NOTIFICATION_SOUND_ENABLED,
-        ...sanitized,
-      });
-      showNotificationStatusMessage("Sound preference saved.");
-    } catch (error) {
-      console.error("Unable to save notification sound enabled state", error);
       showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
     }
   }
