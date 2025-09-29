@@ -20,14 +20,34 @@ let autoCreatePrQueue = Promise.resolve();
 const lastKnownTaskStatuses = new Map();
 const COMPLETED_STATUS_KEYS = new Set(["ready", "pr-created", "merged"]);
 
+const SOUND_STATUSES = ["ready", "pr-created", "merged"];
 const SOUND_STATUS_STORAGE_KEY = "codexSoundStatuses";
+const SOUND_SELECTION_STORAGE_KEY = "codexSoundSelections";
 const DEFAULT_SOUND_STATUSES = ["ready", "merged"];
-const SOUND_STATUS_VALUES = new Set(["ready", "pr-created", "merged"]);
+const DEFAULT_SOUND_SELECTIONS = {
+  ready: "1.mp3",
+  "pr-created": "1.mp3",
+  merged: "1.mp3",
+};
+const SOUND_STATUS_VALUES = new Set(SOUND_STATUSES);
+const SOUND_FILE_OPTIONS = [
+  "1.mp3",
+  "2.mp3",
+  "3.mp3",
+  "4.mp3",
+  "5.mp3",
+  "6.mp3",
+  "7.mp3",
+  "8.mp3",
+];
+const SOUND_FILE_VALUES = new Set(SOUND_FILE_OPTIONS);
 let soundEnabledStatuses = new Set(DEFAULT_SOUND_STATUSES);
+let soundSelectionsByStatus = { ...DEFAULT_SOUND_SELECTIONS };
 
 let hasRenderedHistory = false;
 let audioContext;
 let userHasInteracted = false;
+const audioBufferCache = new Map();
 
 function storageGet(key) {
   if (!storageApi?.local) {
@@ -81,19 +101,50 @@ function sanitizeSoundStatuses(value) {
   return sanitized;
 }
 
+function sanitizeSoundSelections(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const sanitized = {};
+  for (const status of SOUND_STATUSES) {
+    const rawValue = value?.[status];
+    if (typeof rawValue !== "string") {
+      continue;
+    }
+    const normalized = rawValue.trim();
+    if (!normalized || !SOUND_FILE_VALUES.has(normalized)) {
+      continue;
+    }
+    sanitized[status] = normalized;
+  }
+  return sanitized;
+}
+
 function updateSoundEnabledStatuses(statuses) {
   soundEnabledStatuses = new Set(statuses);
 }
 
+function updateSoundSelections(selections) {
+  soundSelectionsByStatus = { ...DEFAULT_SOUND_SELECTIONS, ...selections };
+}
+
 async function loadSoundPreferences() {
   try {
-    const stored = await storageGet(SOUND_STATUS_STORAGE_KEY);
-    const sanitized = sanitizeSoundStatuses(stored);
-    const statuses = sanitized !== null ? sanitized : DEFAULT_SOUND_STATUSES;
+    const [storedStatuses, storedSelections] = await Promise.all([
+      storageGet(SOUND_STATUS_STORAGE_KEY),
+      storageGet(SOUND_SELECTION_STORAGE_KEY),
+    ]);
+    const sanitizedStatuses = sanitizeSoundStatuses(storedStatuses);
+    const statuses =
+      sanitizedStatuses !== null ? sanitizedStatuses : DEFAULT_SOUND_STATUSES;
     updateSoundEnabledStatuses(statuses);
+
+    const sanitizedSelections = sanitizeSoundSelections(storedSelections);
+    updateSoundSelections(sanitizedSelections ?? {});
   } catch (error) {
     console.error("Failed to load sound preferences", error);
     updateSoundEnabledStatuses(DEFAULT_SOUND_STATUSES);
+    updateSoundSelections({});
   }
 }
 
@@ -109,15 +160,20 @@ if (storageChangeEmitter) {
     if (areaName !== "local" || !changes) {
       return;
     }
-    const change = changes[SOUND_STATUS_STORAGE_KEY];
-    if (!change) {
-      return;
+    const statusChange = changes[SOUND_STATUS_STORAGE_KEY];
+    if (statusChange) {
+      const sanitizedStatuses = sanitizeSoundStatuses(statusChange.newValue);
+      if (sanitizedStatuses !== null) {
+        updateSoundEnabledStatuses(sanitizedStatuses);
+      } else {
+        updateSoundEnabledStatuses(DEFAULT_SOUND_STATUSES);
+      }
     }
-    const sanitized = sanitizeSoundStatuses(change.newValue);
-    if (sanitized !== null) {
-      updateSoundEnabledStatuses(sanitized);
-    } else {
-      updateSoundEnabledStatuses(DEFAULT_SOUND_STATUSES);
+
+    const selectionChange = changes[SOUND_SELECTION_STORAGE_KEY];
+    if (selectionChange) {
+      const sanitizedSelections = sanitizeSoundSelections(selectionChange.newValue);
+      updateSoundSelections(sanitizedSelections ?? {});
     }
   });
 }
@@ -130,6 +186,7 @@ function ensureAudioContext() {
   if (!audioContext || audioContext.state === "closed") {
     try {
       audioContext = new AudioContextClass();
+      audioBufferCache.clear();
     } catch (error) {
       console.error("Failed to create audio context", error);
       audioContext = null;
@@ -144,7 +201,127 @@ function ensureAudioContext() {
   return audioContext ?? null;
 }
 
+function getSoundFileUrl(fileName) {
+  if (!fileName) {
+    return null;
+  }
+  try {
+    if (typeof runtime?.getURL === "function") {
+      return runtime.getURL(`src/sounds/${fileName}`);
+    }
+  } catch (error) {
+    console.error("Failed to resolve sound file URL", error);
+  }
+  if (typeof chrome !== "undefined" && typeof chrome.runtime?.getURL === "function") {
+    return chrome.runtime.getURL(`src/sounds/${fileName}`);
+  }
+  return `src/sounds/${fileName}`;
+}
+
+function decodeAudioBuffer(context, arrayBuffer) {
+  if (!context) {
+    return Promise.reject(new Error("Audio context unavailable"));
+  }
+  try {
+    const result = context.decodeAudioData(arrayBuffer);
+    if (result && typeof result.then === "function") {
+      return result;
+    }
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      context.decodeAudioData(arrayBuffer, resolve, reject);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+async function getAudioBuffer(fileName, context) {
+  if (!fileName || !context) {
+    return null;
+  }
+  const cached = audioBufferCache.get(fileName);
+  if (cached instanceof AudioBuffer) {
+    return cached;
+  }
+  if (cached && typeof cached.then === "function") {
+    try {
+      const resolved = await cached;
+      if (resolved instanceof AudioBuffer) {
+        return resolved;
+      }
+    } catch (error) {
+      audioBufferCache.delete(fileName);
+      console.error("Cached sound failed to load", error);
+    }
+  }
+
+  const loaderPromise = (async () => {
+    const url = getSoundFileUrl(fileName);
+    if (!url) {
+      throw new Error("Unknown sound file");
+    }
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Unable to load sound (${response.status})`);
+    }
+    const buffer = await response.arrayBuffer();
+    return decodeAudioBuffer(context, buffer);
+  })()
+    .then((buffer) => {
+      if (buffer instanceof AudioBuffer) {
+        audioBufferCache.set(fileName, buffer);
+        return buffer;
+      }
+      throw new Error("Invalid audio buffer");
+    })
+    .catch((error) => {
+      audioBufferCache.delete(fileName);
+      console.error("Failed to prepare notification sound", error);
+      throw error;
+    });
+
+  audioBufferCache.set(fileName, loaderPromise);
+  try {
+    const resolved = await loaderPromise;
+    return resolved instanceof AudioBuffer ? resolved : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function playStatusSound(statusKey) {
+  const context = ensureAudioContext();
+  if (!context) {
+    return;
+  }
+  const fileName = soundSelectionsByStatus?.[statusKey];
+  const normalized =
+    typeof fileName === "string" && SOUND_FILE_VALUES.has(fileName)
+      ? fileName
+      : DEFAULT_SOUND_SELECTIONS[statusKey] ?? DEFAULT_SOUND_SELECTIONS.ready;
+  const buffer = await getAudioBuffer(normalized, context);
+  if (!buffer) {
+    return;
+  }
+  try {
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    source.start();
+  } catch (error) {
+    console.error("Failed to play notification sound", error);
+  }
+}
+
 function playNotificationSound(kind = "default") {
+  if (SOUND_STATUS_VALUES.has(kind)) {
+    void playStatusSound(kind);
+    return;
+  }
   const context = ensureAudioContext();
   if (!context) {
     return;
@@ -416,7 +593,7 @@ function renderHistory(history) {
   historyList.innerHTML = "";
   const tasks = Array.isArray(history) ? history : [];
   const nextStatuses = new Map();
-  let shouldPlayCompletionSound = false;
+  const statusesToPlay = new Set();
 
   if (!tasks.length) {
     emptyState.hidden = false;
@@ -498,7 +675,7 @@ function renderHistory(history) {
         soundEnabledStatuses.has(statusKey) &&
         !wasPreviouslySoundEligible
       ) {
-        shouldPlayCompletionSound = true;
+        statusesToPlay.add(statusKey);
       }
     }
 
@@ -563,8 +740,8 @@ function renderHistory(history) {
     lastKnownTaskStatuses.set(id, status);
   }
 
-  if (shouldPlayCompletionSound) {
-    playNotificationSound("completion");
+  for (const statusKey of statusesToPlay) {
+    playNotificationSound(statusKey);
   }
 
   hasRenderedHistory = true;
