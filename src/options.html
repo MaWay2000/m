@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>codex-autorun settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <h1>codex-autorun settings</h1>
+        <p>Adjust extension preferences.</p>
+      </header>
+      <section class="card" aria-labelledby="toolbar-title">
+        <div class="card-header">
+          <h2 id="toolbar-title">Toolbar visibility</h2>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toolbar-icon-toggle" />
+          <span>Show the codex-autorun icon in the browser menu bar</span>
+        </label>
+        <p class="hint">
+          If you hide the toolbar icon, you can return here to show it again.
+        </p>
+        <output id="status" role="status" aria-live="polite"></output>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
