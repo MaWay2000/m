@@ -105,10 +105,12 @@ main {
   color: #64748b;
 }
 
-#sound-status-message {
+#sound-status-message,
+#notification-status-message {
   min-height: 1.25rem;
 }
 
-#sound-status-message.error {
+#sound-status-message.error,
+#notification-status-message.error {
   color: #b91c1c;
 }
