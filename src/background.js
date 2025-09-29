@@ -282,8 +282,20 @@ function normalizeActionResult(result) {
 async function clearBrowserActionIcon(action) {
   const attempts = [
     {
+      createDetails: () => ({ path: null }),
+      debugMessage: "Failed to clear browser action icon using null path",
+    },
+    {
+      createDetails: () => ({}),
+      debugMessage: "Failed to clear browser action icon using empty details",
+    },
+    {
       createDetails: () => ({ path: {} }),
       debugMessage: "Failed to clear browser action icon using empty path",
+    },
+    {
+      createDetails: () => ({ imageData: null }),
+      debugMessage: "Failed to clear browser action icon using null imageData",
     },
     {
       createDetails: () => ({ imageData: {} }),
@@ -330,6 +342,13 @@ async function setBrowserActionVisibility(shouldShow) {
   const tasks = [];
 
   if (shouldShow) {
+    if (typeof action.show === "function") {
+      try {
+        tasks.push(normalizeActionResult(action.show()));
+      } catch (error) {
+        console.debug("Failed to show browser action", error);
+      }
+    }
     if (typeof action.setIcon === "function") {
       tasks.push(
         normalizeActionResult(
@@ -363,6 +382,13 @@ async function setBrowserActionVisibility(shouldShow) {
     }
     if (typeof action.setPopup === "function") {
       tasks.push(normalizeActionResult(action.setPopup({ popup: "" })));
+    }
+    if (typeof action.hide === "function") {
+      try {
+        tasks.push(normalizeActionResult(action.hide()));
+      } catch (error) {
+        console.debug("Failed to hide browser action", error);
+      }
     }
     if (typeof action.disable === "function") {
       tasks.push(normalizeActionResult(action.disable()));
