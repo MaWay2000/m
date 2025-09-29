@@ -20,6 +20,38 @@
           toolbar.
         </p>
       </section>
+
+      <section class="card" aria-labelledby="notifications-title">
+        <div class="card-header">
+          <h2 id="notifications-title">Notification sounds</h2>
+        </div>
+        <p class="hint">
+          Choose which task status changes should trigger a sound in the popup.
+        </p>
+        <form id="sound-preferences">
+          <fieldset>
+            <legend class="fieldset-title">
+              Play a notification sound when a task becomes:
+            </legend>
+            <div class="checkbox-list">
+              <label class="checkbox-option">
+                <input type="checkbox" name="sound-status" value="ready" />
+                Ready
+              </label>
+              <label class="checkbox-option">
+                <input type="checkbox" name="sound-status" value="pr-created" />
+                PR created
+              </label>
+              <label class="checkbox-option">
+                <input type="checkbox" name="sound-status" value="merged" />
+                Merged
+              </label>
+            </div>
+          </fieldset>
+        </form>
+        <p class="hint" id="sound-status-message" role="status" aria-live="polite"></p>
+      </section>
     </main>
+    <script src="options.js"></script>
   </body>
 </html>

@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.15 - 2025-09-28
+- Added notification sound preferences to the settings page so you can choose which task statuses play audio alerts.
+
 # 1.1.14 - 2025-09-28
 - Allow the toolbar icon to unpin immediately when the options toggle is unchecked.
 
