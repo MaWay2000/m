@@ -199,6 +199,36 @@ const IGNORED_TEXT_PATTERNS = [
   /\b(?:seconds?|minutes?|hours?|days?)\s+ago\b/i,
 ];
 
+const TRANSIENT_TASK_NAME_PATTERNS = [
+  /^searching\b.*\b(task|web|info|information|context)\b/, // searching the web/task/etc.
+  /^collecting\b.*\b(data|information|context)\b/, // collecting information/data/context
+  /^analyzing\b.*\b(problem|task|context|requirements)\b/, // analyzing the problem/task
+  /^creating\b.*\bplan\b/, // creating a plan
+  /^drafting\b.*\bplan\b/, // drafting a plan
+  /^writing\b.*\b(code|solution|summary|response|tests)\b/, // writing the code/solution/etc.
+  /^reviewing\b.*\b(code|changes|work|solution)\b/, // reviewing the work/changes
+  /^checking\b.*\b(work|changes|tests|progress)\b/, // checking progress/tests
+  /^completing\b.*\btask\b/, // completing the task
+  /^finishing\b.*\b(task|up)\b/, // finishing up the task
+  /^finalizing\b.*\b(changes|solution|work|task)\b/, // finalizing the work
+  /^preparing\b.*\bsubmit\b/, // preparing to submit
+  /^ready to submit\b/, // ready to submit
+  /^just a moment\b/, // just a moment
+  /^hang tight\b/, // hang tight
+  /^please wait\b/, // please wait
+  /^still working\b/, // still working
+  /^working on it\b/, // working on it
+  /^wrapping up\b/, // wrapping up
+  /^gathering\b.*\b(data|information|context)\b/, // gathering data/info/context
+  /^generating\b.*\b(response|summary|code|tests)\b/, // generating the response/code/etc.
+  /^summarizing\b.*\b(progress|work|solution|findings)\b/, // summarizing the progress
+  /^applying\b.*\b(finishing touches|final touches)\b/, // applying finishing touches
+  /^awaiting\b.*\b(feedback|results)\b/, // awaiting feedback/results
+  /^almost done\b/, // almost done
+  /^search complete\b/, // search complete
+  /^cleaning up\b/, // cleaning up
+];
+
 const IGNORED_TEXT_SYMBOLS = ["·", "|", "•"];
 
 const PREFERRED_TASK_TEXT_SELECTORS = [
@@ -230,6 +260,9 @@ function rememberTaskName(taskId, name) {
   if (!normalizedName) {
     return;
   }
+  if (isTransientTaskName(normalizedName)) {
+    return;
+  }
   const limitedName =
     normalizedName.length > MAX_TASK_NAME_LENGTH
       ? `${normalizedName.slice(0, MAX_TASK_NAME_LENGTH - 1).trim()}…`
@@ -251,6 +284,12 @@ function shouldScheduleNameRefresh(name, taskId) {
   }
 
   const lower = normalized.toLowerCase();
+  if (isTransientTaskName(normalized)) {
+    return true;
+  }
+  if (/(…|\.{3})$/.test(normalized)) {
+    return true;
+  }
   if (taskId && normalized === `Task ${taskId}`) {
     return true;
   }
@@ -389,6 +428,9 @@ function isMeaningfulTaskText(text) {
   if (IGNORED_TEXT_PATTERNS.some((pattern) => pattern.test(lower))) {
     return false;
   }
+  if (isTransientTaskName(normalized)) {
+    return false;
+  }
   if (IGNORED_TEXT_SYMBOLS.some((symbol) => normalized.includes(symbol))) {
     const sanitized = normalized.replace(/[·|•]/g, " ").replace(/\s+/g, " ").trim();
     if (!sanitized || sanitized.split(" ").length < 3) {
@@ -400,6 +442,27 @@ function isMeaningfulTaskText(text) {
     return false;
   }
   return true;
+}
+
+function isTransientTaskName(name) {
+  const normalized = normalizeTextContent(name);
+  if (!normalized) {
+    return false;
+  }
+
+  const lower = normalized.toLowerCase();
+  if (TRANSIENT_TASK_NAME_PATTERNS.some((pattern) => pattern.test(lower))) {
+    return true;
+  }
+
+  if (/(…|\.{3})$/.test(normalized)) {
+    const firstWord = lower.split(/\s+/)[0] ?? "";
+    if (firstWord.endsWith("ing") || firstWord === "just" || firstWord === "almost") {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 const IGNORED_TAGS_FOR_TASK_TEXT = new Set([
@@ -537,15 +600,24 @@ function extractTaskName(container, link) {
     }
   }
 
-  if (bestMainCandidate) {
+  const mainCandidate =
+    bestMainCandidate && !isTransientTaskName(bestMainCandidate)
+      ? bestMainCandidate
+      : null;
+  const tagCandidate =
+    bestTagCandidate && !isTransientTaskName(bestTagCandidate)
+      ? bestTagCandidate
+      : null;
+
+  if (mainCandidate) {
     if (
-      bestTagCandidate &&
-      bestTagCandidate !== bestMainCandidate &&
-      !bestMainCandidate.toLowerCase().includes(bestTagCandidate.toLowerCase())
+      tagCandidate &&
+      tagCandidate !== mainCandidate &&
+      !mainCandidate.toLowerCase().includes(tagCandidate.toLowerCase())
     ) {
-      return `${bestMainCandidate} · ${bestTagCandidate}`;
+      return `${mainCandidate} · ${tagCandidate}`;
     }
-    return bestMainCandidate;
+    return mainCandidate;
   }
 
   const fallbackCandidate =
@@ -555,18 +627,18 @@ function extractTaskName(container, link) {
     fallbackCandidate?.textContent ?? link?.textContent ?? container?.textContent,
   );
 
-  if (fallbackText) {
+  if (fallbackText && !isTransientTaskName(fallbackText)) {
     if (
-      bestTagCandidate &&
-      bestTagCandidate !== fallbackText &&
-      !fallbackText.toLowerCase().includes(bestTagCandidate.toLowerCase())
+      tagCandidate &&
+      tagCandidate !== fallbackText &&
+      !fallbackText.toLowerCase().includes(tagCandidate.toLowerCase())
     ) {
-      return `${fallbackText} · ${bestTagCandidate}`;
+      return `${fallbackText} · ${tagCandidate}`;
     }
     return fallbackText;
   }
 
-  return bestTagCandidate || null;
+  return tagCandidate || null;
 }
 
 function extractConversationTaskName() {

@@ -98,6 +98,36 @@ const IGNORED_NAME_PATTERNS = [
   /committing changes?/gi,
 ];
 
+const TRANSIENT_TASK_NAME_PATTERNS = [
+  /^searching\b.*\b(task|web|info|information|context)\b/,
+  /^collecting\b.*\b(data|information|context)\b/,
+  /^analyzing\b.*\b(problem|task|context|requirements)\b/,
+  /^creating\b.*\bplan\b/,
+  /^drafting\b.*\bplan\b/,
+  /^writing\b.*\b(code|solution|summary|response|tests)\b/,
+  /^reviewing\b.*\b(code|changes|work|solution)\b/,
+  /^checking\b.*\b(work|changes|tests|progress)\b/,
+  /^completing\b.*\btask\b/,
+  /^finishing\b.*\b(task|up)\b/,
+  /^finalizing\b.*\b(changes|solution|work|task)\b/,
+  /^preparing\b.*\bsubmit\b/,
+  /^ready to submit\b/,
+  /^just a moment\b/,
+  /^hang tight\b/,
+  /^please wait\b/,
+  /^still working\b/,
+  /^working on it\b/,
+  /^wrapping up\b/,
+  /^gathering\b.*\b(data|information|context)\b/,
+  /^generating\b.*\b(response|summary|code|tests)\b/,
+  /^summarizing\b.*\b(progress|work|solution|findings)\b/,
+  /^applying\b.*\b(finishing touches|final touches)\b/,
+  /^awaiting\b.*\b(feedback|results)\b/,
+  /^almost done\b/,
+  /^search complete\b/,
+  /^cleaning up\b/,
+];
+
 function sanitizeTaskName(value) {
   if (value === null || value === undefined) {
     return "";
@@ -117,6 +147,10 @@ function sanitizeTaskName(value) {
     return "";
   }
 
+  if (isTransientTaskName(result)) {
+    return "";
+  }
+
   if (/^[a-z0-9._-]+\/[a-z0-9._-]+$/i.test(result)) {
     const [, secondSegment = ""] = result.split("/");
     const looksLikeFilePath = /\./.test(secondSegment);
@@ -126,6 +160,31 @@ function sanitizeTaskName(value) {
   }
 
   return result;
+}
+
+function isTransientTaskName(name) {
+  if (!name) {
+    return false;
+  }
+
+  const normalized = String(name).replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return false;
+  }
+
+  const lower = normalized.toLowerCase();
+  if (TRANSIENT_TASK_NAME_PATTERNS.some((pattern) => pattern.test(lower))) {
+    return true;
+  }
+
+  if (/(…|\.{3})$/.test(normalized)) {
+    const firstWord = lower.split(/\s+/)[0] ?? "";
+    if (firstWord.endsWith("ing") || firstWord === "just" || firstWord === "almost") {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function resolveTaskName(candidateName, taskId) {
