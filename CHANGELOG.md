@@ -1,8 +1,5 @@
 # Changelog
 
-# 1.1.15 - 2025-09-28
-- Added an optional setting that requests access to all websites so codex-autorun can monitor Codex tasks beyond the default domains.
-
 # 1.1.14 - 2025-09-28
 - Restore the SVG toolbar icons in the manifest so the codex-autorun button reappears in the menu bar.
 

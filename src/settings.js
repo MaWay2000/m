@@ -7,9 +7,6 @@ export const DEFAULT_SETTINGS = Object.freeze({
   toolbarIcon: {
     visible: true,
   },
-  hostPermissions: {
-    allowAllHosts: false,
-  },
 });
 
 function cloneDefaultSettings() {
@@ -19,9 +16,6 @@ function cloneDefaultSettings() {
     },
     toolbarIcon: {
       visible: DEFAULT_SETTINGS.toolbarIcon.visible,
-    },
-    hostPermissions: {
-      allowAllHosts: DEFAULT_SETTINGS.hostPermissions.allowAllHosts,
     },
   };
 }
@@ -118,15 +112,6 @@ export function normalizeSettings(rawValue = {}) {
       // Support a potential legacy flag name.
       normalized.toolbarIcon.visible = Boolean(rawValue.showToolbarIcon);
     }
-
-    const rawHostPermissions = rawValue.hostPermissions;
-    if (rawHostPermissions && typeof rawHostPermissions === "object") {
-      if (rawHostPermissions.allowAllHosts !== undefined) {
-        normalized.hostPermissions.allowAllHosts = Boolean(
-          rawHostPermissions.allowAllHosts,
-        );
-      }
-    }
   }
 
   return normalized;
@@ -164,10 +149,6 @@ export async function saveSettings(partialSettings) {
       ...current.toolbarIcon,
       ...(partialSettings?.toolbarIcon || {}),
     },
-    hostPermissions: {
-      ...current.hostPermissions,
-      ...(partialSettings?.hostPermissions || {}),
-    },
   });
   return writeSettings(next);
 }
@@ -184,14 +165,6 @@ export async function setToolbarIconVisibility(visible) {
   return saveSettings({
     toolbarIcon: {
       visible: Boolean(visible),
-    },
-  });
-}
-
-export async function setAllHostsPermissionPreference(allowAllHosts) {
-  return saveSettings({
-    hostPermissions: {
-      allowAllHosts: Boolean(allowAllHosts),
     },
   });
 }
