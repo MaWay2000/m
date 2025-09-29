@@ -45,33 +45,8 @@ main {
   font-size: 1.2rem;
 }
 
-.toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
-  font-size: 1rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toggle input[type="checkbox"] {
-  width: 1.25rem;
-  height: 1.25rem;
-  cursor: pointer;
-}
-
 .hint {
   margin: 0;
   font-size: 0.9rem;
   color: #64748b;
-}
-
-#status {
-  min-height: 1.2rem;
-  color: #0f172a;
-  font-size: 0.9rem;
-}
-
-#status.error {
-  color: #dc2626;
 }
