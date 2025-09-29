@@ -32,7 +32,7 @@ const IGNORED_NAME_PATTERNS = [
   /committing changes?/gi,
 ];
 const STATUS_LABELS = {
-  ready: "Ready",
+  ready: "Task ready to view",
   "pr-created": "PR created",
   merged: "Merged",
 };
