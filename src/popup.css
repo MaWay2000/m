@@ -38,8 +38,9 @@ main {
 
 .description {
   margin: 0;
-  color: #475569;
-  font-size: 0.9rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 button {
