@@ -1050,6 +1050,14 @@ function findCreatePrButtonInRoot(root) {
   return null;
 }
 
+function getFrameDocument(frame) {
+  try {
+    return frame?.contentDocument || frame?.contentWindow?.document || null;
+  } catch (error) {
+    return null;
+  }
+}
+
 function findCreatePrButton() {
   const visitedRoots = new Set();
 
@@ -1076,6 +1084,19 @@ function findCreatePrButton() {
           return match;
         }
         queue.push(shadowRoot);
+      }
+
+      const tagName = element?.tagName?.toLowerCase?.();
+      if (tagName === "iframe" || tagName === "frame") {
+        const frameDocument = getFrameDocument(element);
+        if (frameDocument && !visitedRoots.has(frameDocument)) {
+          visitedRoots.add(frameDocument);
+          const match = findCreatePrButtonInRoot(frameDocument);
+          if (match) {
+            return match;
+          }
+          queue.push(frameDocument);
+        }
       }
     }
   }
