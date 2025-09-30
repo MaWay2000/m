@@ -53,6 +53,7 @@ const SOUND_FILE_OPTIONS = [
 const SOUND_FILE_SET = new Set(SOUND_FILE_OPTIONS);
 const STATUS_VALUE_SET = new Set(["ready", "pr-created", "merged"]);
 let notificationEnabledStatuses = new Set(DEFAULT_NOTIFICATION_STATUSES);
+let notificationSoundSelectionOverrides = {};
 let notificationSoundSelections = { ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS };
 let notificationSoundEnabledStatuses = new Set(
   DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
@@ -151,6 +152,21 @@ function updateNotificationEnabledStatuses(statuses) {
 }
 
 function updateNotificationSoundSelections(selections) {
+  const overrides = {};
+  if (selections && typeof selections === "object") {
+    for (const status of STATUS_VALUE_SET) {
+      const value = selections?.[status];
+      if (typeof value !== "string") {
+        continue;
+      }
+      if (value === DEFAULT_NOTIFICATION_SOUND_SELECTIONS[status]) {
+        continue;
+      }
+      overrides[status] = value;
+    }
+  }
+
+  notificationSoundSelectionOverrides = overrides;
   notificationSoundSelections = {
     ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS,
     ...(selections ?? {}),
@@ -301,6 +317,16 @@ function playBrowserNotificationSound(statusKey) {
     return;
   }
 
+  if (
+    notificationDefaultSoundMuted &&
+    !Object.prototype.hasOwnProperty.call(
+      notificationSoundSelectionOverrides,
+      statusKey,
+    )
+  ) {
+    return;
+  }
+
   const rawSelection = notificationSoundSelections?.[statusKey];
   const trimmed = typeof rawSelection === "string" ? rawSelection.trim() : "";
   const normalized =
@@ -309,13 +335,6 @@ function playBrowserNotificationSound(statusKey) {
       : DEFAULT_NOTIFICATION_SOUND_SELECTIONS[statusKey];
 
   if (!normalized || !SOUND_FILE_SET.has(normalized)) {
-    return;
-  }
-
-  if (
-    notificationDefaultSoundMuted &&
-    normalized === DEFAULT_NOTIFICATION_SOUND_SELECTIONS[statusKey]
-  ) {
     return;
   }
 
