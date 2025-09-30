@@ -374,28 +374,20 @@ async function showStatusNotification(task, statusKey) {
     ? `Task ${taskId} is now ${statusLabel}.`
     : `Status changed to ${statusLabel}.`;
 
-  const notificationOptions = {
-    type: "basic",
-    iconUrl,
-    title: `${statusLabel} task`,
-    message,
-    contextMessage: task?.url ? `${contextMessage} Click to open.` : contextMessage,
-  };
-
-  if (notificationDefaultSoundMuted) {
-    notificationOptions.silent = true;
-  }
-
   try {
-    const notificationId = await createNotification(notificationOptions);
+    const notificationId = await createNotification({
+      type: "basic",
+      iconUrl,
+      title: `${statusLabel} task`,
+      message,
+      contextMessage: task?.url ? `${contextMessage} Click to open.` : contextMessage,
+    });
 
     if (notificationId && task?.url) {
       notificationTaskUrls.set(notificationId, task.url);
     }
 
-    if (notificationDefaultSoundMuted) {
-      playBrowserNotificationSound(statusKey);
-    }
+    playBrowserNotificationSound(statusKey);
   } catch (error) {
     console.error("Failed to create notification", error);
   }
