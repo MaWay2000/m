@@ -1,8 +1,5 @@
 # Changelog
 
-# 1.1.18 - 2025-09-28
-- Added dedicated controls for custom Codex sounds and inject them into tracked pages separately from default browser alerts.
-
 # 1.1.17 - 2025-09-28
 - Added a settings toggle to mute the default notification sound unless a custom alert is chosen.
 
