@@ -270,7 +270,6 @@ function updateNotificationSoundToggleState() {
   }
 
   const notificationEnabled = new Set(cachedNotificationStatuses);
-  const defaultSoundMuted = Boolean(cachedDefaultSoundMuted);
   const toggles = form.querySelectorAll(
     'input[name="notification-sound-enabled"]',
   );
@@ -281,7 +280,7 @@ function updateNotificationSoundToggleState() {
       continue;
     }
 
-    toggle.disabled = defaultSoundMuted || !notificationEnabled.has(status);
+    toggle.disabled = !notificationEnabled.has(status);
   }
 }
 
@@ -293,7 +292,6 @@ function updateNotificationSoundSelectState() {
 
   const notificationEnabled = new Set(cachedNotificationStatuses);
   const soundEnabled = new Set(cachedSoundEnabledStatuses);
-  const defaultSoundMuted = Boolean(cachedDefaultSoundMuted);
   const selects = form.querySelectorAll(
     'select[name="notification-sound-selection"]',
   );
@@ -307,7 +305,7 @@ function updateNotificationSoundSelectState() {
     const enabled =
       notificationEnabled.has(status) && soundEnabled.has(status);
 
-    select.disabled = defaultSoundMuted || !enabled;
+    select.disabled = !enabled;
   }
 }
 
