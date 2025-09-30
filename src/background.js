@@ -317,6 +317,16 @@ function playBrowserNotificationSound(statusKey) {
     return;
   }
 
+  if (
+    notificationDefaultSoundMuted &&
+    !Object.prototype.hasOwnProperty.call(
+      notificationSoundSelectionOverrides,
+      statusKey,
+    )
+  ) {
+    return;
+  }
+
   const rawSelection = notificationSoundSelections?.[statusKey];
   const trimmed = typeof rawSelection === "string" ? rawSelection.trim() : "";
   const normalized =
@@ -325,17 +335,6 @@ function playBrowserNotificationSound(statusKey) {
       : DEFAULT_NOTIFICATION_SOUND_SELECTIONS[statusKey];
 
   if (!normalized || !SOUND_FILE_SET.has(normalized)) {
-    return;
-  }
-
-  const defaultSelection = DEFAULT_NOTIFICATION_SOUND_SELECTIONS[statusKey];
-  const hasCustomSelection =
-    Object.prototype.hasOwnProperty.call(
-      notificationSoundSelectionOverrides,
-      statusKey,
-    ) || (defaultSelection ? normalized !== defaultSelection : false);
-
-  if (notificationDefaultSoundMuted && !hasCustomSelection) {
     return;
   }
 
