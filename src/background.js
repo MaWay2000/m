@@ -24,12 +24,19 @@ const CLOSED_TASKS_KEY = "codexClosedTaskIds";
 const NOTIFICATION_STATUS_STORAGE_KEY = "codexNotificationStatuses";
 const NOTIFICATION_SOUND_SELECTION_STORAGE_KEY =
   "codexNotificationSoundSelections";
+const NOTIFICATION_SOUND_ENABLED_STORAGE_KEY =
+  "codexNotificationSoundEnabledStatuses";
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "merged"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   ready: "1.mp3",
   "pr-created": "1.mp3",
   merged: "1.mp3",
 };
+const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [
+  "ready",
+  "pr-created",
+  "merged",
+];
 const SOUND_FILE_OPTIONS = [
   "1.mp3",
   "2.mp3",
@@ -44,6 +51,9 @@ const SOUND_FILE_SET = new Set(SOUND_FILE_OPTIONS);
 const STATUS_VALUE_SET = new Set(["ready", "pr-created", "merged"]);
 let notificationEnabledStatuses = new Set(DEFAULT_NOTIFICATION_STATUSES);
 let notificationSoundSelections = { ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS };
+let notificationSoundEnabledStatuses = new Set(
+  DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
+);
 const notificationTaskUrls = new Map();
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -116,12 +126,21 @@ function updateNotificationSoundSelections(selections) {
   };
 }
 
+function updateNotificationSoundEnabledStatuses(statuses) {
+  const nextStatuses = Array.isArray(statuses)
+    ? statuses
+    : DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES;
+  notificationSoundEnabledStatuses = new Set(nextStatuses);
+}
+
 async function loadNotificationPreferences() {
   try {
-    const [storedStatuses, storedSelections] = await Promise.all([
-      storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
-      storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
-    ]);
+    const [storedStatuses, storedSelections, storedSoundEnabled] =
+      await Promise.all([
+        storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
+        storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
+        storageGet(NOTIFICATION_SOUND_ENABLED_STORAGE_KEY),
+      ]);
     const sanitizedStatuses = sanitizeStatusList(storedStatuses);
     const statuses =
       sanitizedStatuses !== null ? sanitizedStatuses : DEFAULT_NOTIFICATION_STATUSES;
@@ -129,10 +148,20 @@ async function loadNotificationPreferences() {
 
     const sanitizedSelections = sanitizeSoundSelectionMap(storedSelections);
     updateNotificationSoundSelections(sanitizedSelections);
+
+    const sanitizedSoundEnabled = sanitizeStatusList(storedSoundEnabled);
+    const soundEnabledStatuses =
+      sanitizedSoundEnabled !== null
+        ? sanitizedSoundEnabled
+        : DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES;
+    updateNotificationSoundEnabledStatuses(soundEnabledStatuses);
   } catch (error) {
     console.error("Failed to load notification preferences", error);
     updateNotificationEnabledStatuses(DEFAULT_NOTIFICATION_STATUSES);
     updateNotificationSoundSelections(null);
+    updateNotificationSoundEnabledStatuses(
+      DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
+    );
   }
 }
 
@@ -217,6 +246,10 @@ function getSoundFileUrl(fileName) {
 
 function playBrowserNotificationSound(statusKey) {
   if (typeof Audio !== "function") {
+    return;
+  }
+
+  if (!notificationSoundEnabledStatuses.has(statusKey)) {
     return;
   }
 
@@ -316,6 +349,21 @@ if (storageChangeEmitter) {
     if (notificationSoundChange) {
       const sanitized = sanitizeSoundSelectionMap(notificationSoundChange.newValue);
       updateNotificationSoundSelections(sanitized);
+    }
+
+    const notificationSoundEnabledChange =
+      changes[NOTIFICATION_SOUND_ENABLED_STORAGE_KEY];
+    if (notificationSoundEnabledChange) {
+      const sanitized = sanitizeStatusList(
+        notificationSoundEnabledChange.newValue,
+      );
+      if (sanitized !== null) {
+        updateNotificationSoundEnabledStatuses(sanitized);
+      } else {
+        updateNotificationSoundEnabledStatuses(
+          DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
+        );
+      }
     }
   });
 }
