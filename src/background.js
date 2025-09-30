@@ -375,12 +375,15 @@ async function showStatusNotification(task, statusKey) {
     : `Status changed to ${statusLabel}.`;
 
   try {
+    const muteDefaultSound = Boolean(notificationDefaultSoundMuted);
+
     const notificationId = await createNotification({
       type: "basic",
       iconUrl,
       title: `${statusLabel} task`,
       message,
       contextMessage: task?.url ? `${contextMessage} Click to open.` : contextMessage,
+      silent: muteDefaultSound,
     });
 
     if (notificationId && task?.url) {
