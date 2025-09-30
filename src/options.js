@@ -263,6 +263,39 @@ function applyNotificationDefaultSoundMuted(isMuted) {
   updateNotificationSoundSelectState();
 }
 
+async function persistDefaultSoundMuted(isMuted, options = {}) {
+  const normalized = Boolean(isMuted);
+  try {
+    await storageSet(NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY, normalized);
+    applyNotificationDefaultSoundMuted(normalized);
+
+    if (Object.prototype.hasOwnProperty.call(options, "successMessage")) {
+      showNotificationStatusMessage(options.successMessage ?? "");
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Unable to save default sound setting", error);
+    showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
+    return false;
+  }
+}
+
+async function ensureDefaultSoundMutedConsistency(soundEnabledStatuses) {
+  const hasCustomSoundEnabled =
+    Array.isArray(soundEnabledStatuses) && soundEnabledStatuses.length > 0;
+
+  if (hasCustomSoundEnabled && !cachedDefaultSoundMuted) {
+    return persistDefaultSoundMuted(true);
+  }
+
+  if (!hasCustomSoundEnabled && cachedDefaultSoundMuted) {
+    return persistDefaultSoundMuted(false);
+  }
+
+  return true;
+}
+
 function updateNotificationSoundToggleState() {
   const form = document.getElementById("notification-preferences");
   if (!form) {
@@ -364,7 +397,12 @@ async function loadNotificationPreferences() {
         : DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED;
     applyNotificationDefaultSoundMuted(defaultMuted);
 
-    showNotificationStatusMessage("");
+    const ensureResult = await ensureDefaultSoundMutedConsistency(
+      soundEnabledStatuses,
+    );
+    if (ensureResult !== false) {
+      showNotificationStatusMessage("");
+    }
   } catch (error) {
     console.error("Unable to load notification preferences", error);
     applyNotificationStatuses(DEFAULT_NOTIFICATION_STATUSES);
@@ -492,6 +530,8 @@ async function handleNotificationPreferencesChange(event) {
       } else {
         showNotificationStatusMessage("Sound preference saved.");
       }
+
+      await ensureDefaultSoundMutedConsistency(statusesToStore);
     } catch (error) {
       console.error("Unable to save notification sound setting", error);
       showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
@@ -506,21 +546,10 @@ async function handleNotificationPreferencesChange(event) {
   ) {
     const isMuted = Boolean(target.checked);
 
-    try {
-      await storageSet(
-        NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY,
-        isMuted,
-      );
-      applyNotificationDefaultSoundMuted(isMuted);
-      showNotificationStatusMessage(
-        isMuted
-          ? "Default notification sound muted."
-          : "Default notification sound enabled.",
-      );
-    } catch (error) {
-      console.error("Unable to save default sound setting", error);
-      showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
-    }
+    const successMessage = isMuted
+      ? "Default notification sound muted."
+      : "Default notification sound enabled.";
+    await persistDefaultSoundMuted(isMuted, { successMessage });
 
     return;
   }
