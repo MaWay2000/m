@@ -1,0 +1,21 @@
+# Manual Test: Default notification sound mute toggle
+
+## Preconditions
+- codex-autorun extension loaded temporarily in Firefox via `about:debugging`.
+- Ensure at least one tracked task exists so notifications can be triggered.
+
+## Steps
+1. Open the extension options page from the toolbar button menu.
+2. In **Notification sounds**, check **Mute default sound** and leave all status-specific sound selectors on **Default (1.mp3)**.
+3. Trigger a **Task ready to view** notification (for example by letting a tracked task finish processing).
+4. Confirm that the notification appears without playing an audio alert.
+5. Return to the options page and pick a custom sound (e.g. **2.mp3**) for **Task ready to view** while the mute toggle remains checked.
+6. Trigger another **Task ready to view** notification.
+7. Confirm that the selected custom sound now plays for the notification.
+8. Uncheck **Mute default sound** and repeat the notification trigger once more.
+9. Confirm that the default sound (**1.mp3**) plays again for statuses without overrides.
+
+## Expected results
+- Steps 1–4: No audio plays when the mute toggle is enabled and no custom sound is selected.
+- Steps 5–7: Custom sounds still play when explicitly chosen, even if the mute toggle is enabled.
+- Steps 8–9: Default audio returns once the mute toggle is disabled.

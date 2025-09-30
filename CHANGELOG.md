@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.18 - 2025-09-28
+- Documented a manual test case covering the default notification sound mute toggle behavior.
+
 # 1.1.17 - 2025-09-28
 - Added a settings toggle to mute the default notification sound unless a custom alert is chosen.
 
