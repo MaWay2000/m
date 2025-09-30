@@ -26,6 +26,8 @@ const NOTIFICATION_SOUND_SELECTION_STORAGE_KEY =
   "codexNotificationSoundSelections";
 const NOTIFICATION_SOUND_ENABLED_STORAGE_KEY =
   "codexNotificationSoundEnabledStatuses";
+const NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY =
+  "codexNotificationDefaultSoundMuted";
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "merged"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   ready: "1.mp3",
@@ -37,6 +39,7 @@ const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [
   "pr-created",
   "merged",
 ];
+const DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED = false;
 const SOUND_FILE_OPTIONS = [
   "1.mp3",
   "2.mp3",
@@ -50,10 +53,12 @@ const SOUND_FILE_OPTIONS = [
 const SOUND_FILE_SET = new Set(SOUND_FILE_OPTIONS);
 const STATUS_VALUE_SET = new Set(["ready", "pr-created", "merged"]);
 let notificationEnabledStatuses = new Set(DEFAULT_NOTIFICATION_STATUSES);
+let notificationSoundSelectionOverrides = {};
 let notificationSoundSelections = { ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS };
 let notificationSoundEnabledStatuses = new Set(
   DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
 );
+let notificationDefaultSoundMuted = DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED;
 const notificationTaskUrls = new Map();
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -115,11 +120,53 @@ function sanitizeSoundSelectionMap(value) {
   return sanitized;
 }
 
+function sanitizeBoolean(value) {
+  if (value === true) {
+    return true;
+  }
+  if (value === false) {
+    return false;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+  }
+  if (typeof value === "number") {
+    if (value === 1) {
+      return true;
+    }
+    if (value === 0) {
+      return false;
+    }
+  }
+  return null;
+}
+
 function updateNotificationEnabledStatuses(statuses) {
   notificationEnabledStatuses = new Set(statuses);
 }
 
 function updateNotificationSoundSelections(selections) {
+  const overrides = {};
+  if (selections && typeof selections === "object") {
+    for (const status of STATUS_VALUE_SET) {
+      const value = selections?.[status];
+      if (typeof value !== "string") {
+        continue;
+      }
+      if (value === DEFAULT_NOTIFICATION_SOUND_SELECTIONS[status]) {
+        continue;
+      }
+      overrides[status] = value;
+    }
+  }
+
+  notificationSoundSelectionOverrides = overrides;
   notificationSoundSelections = {
     ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS,
     ...(selections ?? {}),
@@ -133,14 +180,23 @@ function updateNotificationSoundEnabledStatuses(statuses) {
   notificationSoundEnabledStatuses = new Set(nextStatuses);
 }
 
+function updateNotificationDefaultSoundMuted(isMuted) {
+  notificationDefaultSoundMuted = Boolean(isMuted);
+}
+
 async function loadNotificationPreferences() {
   try {
-    const [storedStatuses, storedSelections, storedSoundEnabled] =
-      await Promise.all([
-        storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
-        storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
-        storageGet(NOTIFICATION_SOUND_ENABLED_STORAGE_KEY),
-      ]);
+    const [
+      storedStatuses,
+      storedSelections,
+      storedSoundEnabled,
+      storedDefaultSoundMuted,
+    ] = await Promise.all([
+      storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
+      storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
+      storageGet(NOTIFICATION_SOUND_ENABLED_STORAGE_KEY),
+      storageGet(NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY),
+    ]);
     const sanitizedStatuses = sanitizeStatusList(storedStatuses);
     const statuses =
       sanitizedStatuses !== null ? sanitizedStatuses : DEFAULT_NOTIFICATION_STATUSES;
@@ -155,6 +211,13 @@ async function loadNotificationPreferences() {
         ? sanitizedSoundEnabled
         : DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES;
     updateNotificationSoundEnabledStatuses(soundEnabledStatuses);
+
+    const sanitizedDefaultMuted = sanitizeBoolean(storedDefaultSoundMuted);
+    const defaultSoundMuted =
+      sanitizedDefaultMuted !== null
+        ? sanitizedDefaultMuted
+        : DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED;
+    updateNotificationDefaultSoundMuted(defaultSoundMuted);
   } catch (error) {
     console.error("Failed to load notification preferences", error);
     updateNotificationEnabledStatuses(DEFAULT_NOTIFICATION_STATUSES);
@@ -162,6 +225,7 @@ async function loadNotificationPreferences() {
     updateNotificationSoundEnabledStatuses(
       DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
     );
+    updateNotificationDefaultSoundMuted(DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED);
   }
 }
 
@@ -250,6 +314,16 @@ function playBrowserNotificationSound(statusKey) {
   }
 
   if (!notificationSoundEnabledStatuses.has(statusKey)) {
+    return;
+  }
+
+  if (
+    notificationDefaultSoundMuted &&
+    !Object.prototype.hasOwnProperty.call(
+      notificationSoundSelectionOverrides,
+      statusKey,
+    )
+  ) {
     return;
   }
 
@@ -362,6 +436,19 @@ if (storageChangeEmitter) {
       } else {
         updateNotificationSoundEnabledStatuses(
           DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
+        );
+      }
+    }
+
+    const defaultSoundMutedChange =
+      changes[NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY];
+    if (defaultSoundMutedChange) {
+      const sanitized = sanitizeBoolean(defaultSoundMutedChange.newValue);
+      if (sanitized !== null) {
+        updateNotificationDefaultSoundMuted(sanitized);
+      } else {
+        updateNotificationDefaultSoundMuted(
+          DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED,
         );
       }
     }

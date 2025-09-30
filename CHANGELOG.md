@@ -1,5 +1,8 @@
 # Changelog
 
+# 1.1.17 - 2025-09-28
+- Added a settings toggle to mute the default notification sound unless a custom alert is chosen.
+
 # 1.1.16 - 2025-09-28
 - Renamed the Ready status label across the extension to **Task ready to view** so notifications and settings reflect the new wording.
 
