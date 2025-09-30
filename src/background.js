@@ -307,7 +307,6 @@ async function showStatusNotification(task, statusKey) {
       title: `${statusLabel} task`,
       message,
       contextMessage: task?.url ? `${contextMessage} Click to open.` : contextMessage,
-      silent: true,
     });
 
     if (notificationId && task?.url) {
