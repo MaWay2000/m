@@ -132,6 +132,10 @@ main {
   color: #64748b;
 }
 
+.fieldset-hint {
+  margin-bottom: 0.5rem;
+}
+
 #notification-status-message {
   min-height: 1.25rem;
 }

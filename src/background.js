@@ -28,6 +28,8 @@ const NOTIFICATION_SOUND_ENABLED_STORAGE_KEY =
   "codexNotificationSoundEnabledStatuses";
 const NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY =
   "codexNotificationDefaultSoundMuted";
+const CUSTOM_SOUND_STATUS_STORAGE_KEY = "codexSoundStatuses";
+const CUSTOM_SOUND_SELECTION_STORAGE_KEY = "codexSoundSelections";
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "merged"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   ready: "1.mp3",
@@ -40,6 +42,12 @@ const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [
   "merged",
 ];
 const DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED = false;
+const DEFAULT_CUSTOM_SOUND_STATUSES = ["ready", "merged"];
+const DEFAULT_CUSTOM_SOUND_SELECTIONS = {
+  ready: "1.mp3",
+  "pr-created": "1.mp3",
+  merged: "1.mp3",
+};
 const SOUND_FILE_OPTIONS = [
   "1.mp3",
   "2.mp3",
@@ -52,6 +60,10 @@ const SOUND_FILE_OPTIONS = [
 ];
 const SOUND_FILE_SET = new Set(SOUND_FILE_OPTIONS);
 const STATUS_VALUE_SET = new Set(["ready", "pr-created", "merged"]);
+const CODEX_TAB_URL_PATTERNS = [
+  "https://chatgpt.com/*",
+  "https://debuggpt.tools/*",
+];
 let notificationEnabledStatuses = new Set(DEFAULT_NOTIFICATION_STATUSES);
 let notificationSoundSelectionOverrides = {};
 let notificationSoundSelections = { ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS };
@@ -59,6 +71,8 @@ let notificationSoundEnabledStatuses = new Set(
   DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
 );
 let notificationDefaultSoundMuted = DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED;
+let customSoundEnabledStatuses = new Set(DEFAULT_CUSTOM_SOUND_STATUSES);
+let customSoundSelections = { ...DEFAULT_CUSTOM_SOUND_SELECTIONS };
 const notificationTaskUrls = new Map();
 const IGNORED_NAME_PATTERNS = [
   /working on your task/gi,
@@ -184,6 +198,20 @@ function updateNotificationDefaultSoundMuted(isMuted) {
   notificationDefaultSoundMuted = Boolean(isMuted);
 }
 
+function updateCustomSoundEnabledStatuses(statuses) {
+  const nextStatuses = Array.isArray(statuses)
+    ? statuses
+    : DEFAULT_CUSTOM_SOUND_STATUSES;
+  customSoundEnabledStatuses = new Set(nextStatuses);
+}
+
+function updateCustomSoundSelections(selections) {
+  customSoundSelections = {
+    ...DEFAULT_CUSTOM_SOUND_SELECTIONS,
+    ...(selections ?? {}),
+  };
+}
+
 async function loadNotificationPreferences() {
   try {
     const [
@@ -226,6 +254,31 @@ async function loadNotificationPreferences() {
       DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
     );
     updateNotificationDefaultSoundMuted(DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED);
+  }
+}
+
+async function loadCustomSoundPreferences() {
+  try {
+    const [storedStatuses, storedSelections] = await Promise.all([
+      storageGet(CUSTOM_SOUND_STATUS_STORAGE_KEY),
+      storageGet(CUSTOM_SOUND_SELECTION_STORAGE_KEY),
+    ]);
+
+    const sanitizedStatuses = sanitizeStatusList(storedStatuses);
+    const statuses =
+      sanitizedStatuses !== null ? sanitizedStatuses : DEFAULT_CUSTOM_SOUND_STATUSES;
+    updateCustomSoundEnabledStatuses(statuses);
+
+    const sanitizedSelections = sanitizeSoundSelectionMap(storedSelections);
+    const selections = {
+      ...DEFAULT_CUSTOM_SOUND_SELECTIONS,
+      ...(sanitizedSelections ?? {}),
+    };
+    updateCustomSoundSelections(selections);
+  } catch (error) {
+    console.error("Failed to load custom sound preferences", error);
+    updateCustomSoundEnabledStatuses(DEFAULT_CUSTOM_SOUND_STATUSES);
+    updateCustomSoundSelections(DEFAULT_CUSTOM_SOUND_SELECTIONS);
   }
 }
 
@@ -357,6 +410,131 @@ function playBrowserNotificationSound(statusKey) {
   }
 }
 
+function queryCodexTabs() {
+  if (!tabs?.query) {
+    return Promise.resolve([]);
+  }
+
+  const queryInfo = { url: CODEX_TAB_URL_PATTERNS };
+
+  try {
+    const result = tabs.query(queryInfo);
+    if (result && typeof result.then === "function") {
+      return result
+        .then((tabList) => (Array.isArray(tabList) ? tabList : []))
+        .catch((error) => {
+          console.error("Failed to query Codex tabs", error);
+          return [];
+        });
+    }
+  } catch (error) {
+    console.error("Failed to query Codex tabs", error);
+    return Promise.resolve([]);
+  }
+
+  return new Promise((resolve) => {
+    try {
+      tabs.query(queryInfo, (tabList) => {
+        if (runtime?.lastError) {
+          console.error("Tab query error", runtime.lastError);
+          resolve([]);
+          return;
+        }
+        resolve(Array.isArray(tabList) ? tabList : []);
+      });
+    } catch (error) {
+      console.error("Failed to query Codex tabs", error);
+      resolve([]);
+    }
+  });
+}
+
+function sendMessageToTab(tabId, message) {
+  if (typeof tabId !== "number" || !tabs?.sendMessage) {
+    return Promise.resolve();
+  }
+
+  try {
+    const result = tabs.sendMessage(tabId, message);
+    if (result && typeof result.then === "function") {
+      return result.then(() => {}).catch((error) => {
+        throw error;
+      });
+    }
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      tabs.sendMessage(tabId, message, () => {
+        const error = runtime?.lastError;
+        if (error) {
+          reject(new Error(error.message));
+          return;
+        }
+        resolve();
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+async function playCustomSoundInTabs(statusKey) {
+  if (!statusKey || !customSoundEnabledStatuses.has(statusKey)) {
+    return;
+  }
+
+  if (!tabs?.query || !tabs?.sendMessage) {
+    return;
+  }
+
+  const fileName = customSoundSelections?.[statusKey];
+  const normalized =
+    typeof fileName === "string" && SOUND_FILE_SET.has(fileName)
+      ? fileName
+      : DEFAULT_CUSTOM_SOUND_SELECTIONS[statusKey];
+
+  if (!normalized || !SOUND_FILE_SET.has(normalized)) {
+    return;
+  }
+
+  try {
+    const tabList = await queryCodexTabs();
+    if (!Array.isArray(tabList) || !tabList.length) {
+      return;
+    }
+
+    const payload = {
+      type: "codex-play-sound",
+      status: statusKey,
+      fileName: normalized,
+    };
+
+    const deliveries = [];
+
+    for (const tab of tabList) {
+      const tabId = tab?.id;
+      if (typeof tabId !== "number") {
+        continue;
+      }
+
+      deliveries.push(
+        sendMessageToTab(tabId, payload).catch((error) => {
+          console.debug("Failed to deliver custom sound message", error);
+        }),
+      );
+    }
+
+    if (deliveries.length) {
+      await Promise.all(deliveries);
+    }
+  } catch (error) {
+    console.error("Failed to trigger custom Codex sound", error);
+  }
+}
+
 async function showStatusNotification(task, statusKey) {
   if (!notifications?.create) {
     return;
@@ -394,6 +572,7 @@ async function showStatusNotification(task, statusKey) {
 }
 
 loadNotificationPreferences();
+loadCustomSoundPreferences();
 
 const storageChangeEmitter =
   typeof browser !== "undefined" && browser?.storage?.onChanged
@@ -451,6 +630,28 @@ if (storageChangeEmitter) {
           DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED,
         );
       }
+    }
+
+    const customSoundStatusChange = changes[CUSTOM_SOUND_STATUS_STORAGE_KEY];
+    if (customSoundStatusChange) {
+      const sanitized = sanitizeStatusList(customSoundStatusChange.newValue);
+      if (sanitized !== null) {
+        updateCustomSoundEnabledStatuses(sanitized);
+      } else {
+        updateCustomSoundEnabledStatuses(DEFAULT_CUSTOM_SOUND_STATUSES);
+      }
+    }
+
+    const customSoundSelectionChange = changes[CUSTOM_SOUND_SELECTION_STORAGE_KEY];
+    if (customSoundSelectionChange) {
+      const sanitized = sanitizeSoundSelectionMap(
+        customSoundSelectionChange.newValue,
+      );
+      const selections = {
+        ...DEFAULT_CUSTOM_SOUND_SELECTIONS,
+        ...(sanitized ?? {}),
+      };
+      updateCustomSoundSelections(selections);
     }
   });
 }
@@ -723,9 +924,20 @@ async function updateHistory(task) {
     nextStatus !== previousStatus &&
     notificationEnabledStatuses.has(nextStatus);
 
+  const shouldPlayCustomSound =
+    nextStatus &&
+    nextStatus !== previousStatus &&
+    customSoundEnabledStatuses.has(nextStatus);
+
   if (shouldNotify) {
     showStatusNotification(updated, nextStatus).catch((error) => {
       console.error("Failed to show status notification", error);
+    });
+  }
+
+  if (shouldPlayCustomSound) {
+    playCustomSoundInTabs(nextStatus).catch((error) => {
+      console.error("Failed to trigger custom sound injection", error);
     });
   }
 

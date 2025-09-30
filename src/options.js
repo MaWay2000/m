@@ -14,6 +14,8 @@ const NOTIFICATION_SOUND_ENABLED_STORAGE_KEY =
   "codexNotificationSoundEnabledStatuses";
 const NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY =
   "codexNotificationDefaultSoundMuted";
+const CUSTOM_SOUND_STATUS_STORAGE_KEY = "codexSoundStatuses";
+const CUSTOM_SOUND_SELECTION_STORAGE_KEY = "codexSoundSelections";
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "pr-created"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   ready: "1.mp3",
@@ -22,6 +24,12 @@ const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
 };
 const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [...STATUS_OPTIONS];
 const DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED = false;
+const DEFAULT_CUSTOM_SOUND_STATUSES = ["ready", "merged"];
+const DEFAULT_CUSTOM_SOUND_SELECTIONS = {
+  ready: "1.mp3",
+  "pr-created": "1.mp3",
+  merged: "1.mp3",
+};
 const STATUS_LABELS = {
   ready: "Task ready to view",
   "pr-created": "PR created",
@@ -41,6 +49,7 @@ const SOUND_FILE_VALUES = new Set(SOUND_FILE_OPTIONS);
 let cachedNotificationStatuses = [...DEFAULT_NOTIFICATION_STATUSES];
 let cachedSoundEnabledStatuses = [...DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES];
 let cachedDefaultSoundMuted = DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED;
+let cachedCustomSoundEnabledStatuses = [...DEFAULT_CUSTOM_SOUND_STATUSES];
 
 function storageGet(key) {
   if (!storageApi?.local) {
@@ -226,6 +235,30 @@ function applyNotificationSoundSelections(selections) {
   }
 }
 
+function applyCustomSoundSelections(selections) {
+  const form = document.getElementById("notification-preferences");
+  if (!form) {
+    return;
+  }
+
+  const selects = form.querySelectorAll('select[name="custom-sound-selection"]');
+
+  for (const select of selects) {
+    const status = select.dataset?.status;
+    if (!status) {
+      continue;
+    }
+
+    const desired = selections?.[status] ?? DEFAULT_CUSTOM_SOUND_SELECTIONS[status];
+
+    if (desired && SOUND_FILE_VALUES.has(desired)) {
+      select.value = desired;
+    } else {
+      select.value = DEFAULT_CUSTOM_SOUND_SELECTIONS[status];
+    }
+  }
+}
+
 function applyNotificationSoundEnabledStatuses(statuses) {
   const form = document.getElementById("notification-preferences");
   if (!form) {
@@ -249,6 +282,28 @@ function applyNotificationSoundEnabledStatuses(statuses) {
   cachedSoundEnabledStatuses = [...statuses];
   updateNotificationSoundToggleState();
   updateNotificationSoundSelectState();
+}
+
+function applyCustomSoundEnabledStatuses(statuses) {
+  const form = document.getElementById("notification-preferences");
+  if (!form) {
+    return;
+  }
+
+  const toggles = form.querySelectorAll('input[name="custom-sound-enabled"]');
+  const enabled = new Set(statuses);
+
+  for (const toggle of toggles) {
+    const value = toggle.value;
+    if (!value) {
+      continue;
+    }
+
+    toggle.checked = enabled.has(value);
+  }
+
+  cachedCustomSoundEnabledStatuses = [...statuses];
+  updateCustomSoundSelectState();
 }
 
 function applyNotificationDefaultSoundMuted(isMuted) {
@@ -309,6 +364,25 @@ function updateNotificationSoundSelectState() {
   }
 }
 
+function updateCustomSoundSelectState() {
+  const form = document.getElementById("notification-preferences");
+  if (!form) {
+    return;
+  }
+
+  const enabled = new Set(cachedCustomSoundEnabledStatuses);
+  const selects = form.querySelectorAll('select[name="custom-sound-selection"]');
+
+  for (const select of selects) {
+    const status = select.dataset?.status;
+    if (!status) {
+      continue;
+    }
+
+    select.disabled = !enabled.has(status);
+  }
+}
+
 function showNotificationStatusMessage(message, isError = false) {
   const output = document.getElementById("notification-status-message");
   if (!output) {
@@ -330,11 +404,15 @@ async function loadNotificationPreferences() {
       storedSelections,
       storedSoundEnabledStatuses,
       storedDefaultSoundMuted,
+      storedCustomStatuses,
+      storedCustomSelections,
     ] = await Promise.all([
       storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
       storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
       storageGet(NOTIFICATION_SOUND_ENABLED_STORAGE_KEY),
       storageGet(NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY),
+      storageGet(CUSTOM_SOUND_STATUS_STORAGE_KEY),
+      storageGet(CUSTOM_SOUND_SELECTION_STORAGE_KEY),
     ]);
     const sanitizedStatuses = sanitizeNotificationStatuses(storedStatuses);
     const statuses =
@@ -364,6 +442,20 @@ async function loadNotificationPreferences() {
         : DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED;
     applyNotificationDefaultSoundMuted(defaultMuted);
 
+    const sanitizedCustomStatuses = sanitizeSoundEnabledStatuses(storedCustomStatuses);
+    const customStatuses =
+      sanitizedCustomStatuses !== null
+        ? sanitizedCustomStatuses
+        : DEFAULT_CUSTOM_SOUND_STATUSES;
+    applyCustomSoundEnabledStatuses(customStatuses);
+
+    const sanitizedCustomSelections = sanitizeSoundSelections(storedCustomSelections);
+    const customSelections = {
+      ...DEFAULT_CUSTOM_SOUND_SELECTIONS,
+      ...(sanitizedCustomSelections ?? {}),
+    };
+    applyCustomSoundSelections(customSelections);
+
     showNotificationStatusMessage("");
   } catch (error) {
     console.error("Unable to load notification preferences", error);
@@ -373,6 +465,8 @@ async function loadNotificationPreferences() {
       DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
     );
     applyNotificationDefaultSoundMuted(DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED);
+    applyCustomSoundEnabledStatuses(DEFAULT_CUSTOM_SOUND_STATUSES);
+    applyCustomSoundSelections(DEFAULT_CUSTOM_SOUND_SELECTIONS);
     showNotificationStatusMessage(`Unable to load preferences: ${error.message}`, true);
   }
 }
@@ -428,6 +522,47 @@ function readNotificationSoundSelections() {
   const selects = form.querySelectorAll(
     'select[name="notification-sound-selection"]',
   );
+
+  for (const select of selects) {
+    const status = select.dataset?.status;
+    if (!status) {
+      continue;
+    }
+
+    selections[status] = select.value;
+  }
+
+  return selections;
+}
+
+function readCustomSoundEnabledStatuses() {
+  const form = document.getElementById("notification-preferences");
+  if (!form) {
+    return [];
+  }
+
+  const toggles = form.querySelectorAll('input[name="custom-sound-enabled"]:checked');
+  const selected = [];
+
+  for (const toggle of toggles) {
+    if (!toggle.value) {
+      continue;
+    }
+
+    selected.push(toggle.value);
+  }
+
+  return selected;
+}
+
+function readCustomSoundSelections() {
+  const form = document.getElementById("notification-preferences");
+  if (!form) {
+    return {};
+  }
+
+  const selections = {};
+  const selects = form.querySelectorAll('select[name="custom-sound-selection"]');
 
   for (const select of selects) {
     const status = select.dataset?.status;
@@ -544,6 +679,55 @@ async function handleNotificationPreferencesChange(event) {
       showNotificationStatusMessage("Sound choice saved.");
     } catch (error) {
       console.error("Unable to save notification sound selection", error);
+      showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
+    }
+  }
+
+  if (target instanceof HTMLInputElement && target.name === "custom-sound-enabled") {
+    const selected = readCustomSoundEnabledStatuses();
+    const sanitized = sanitizeSoundEnabledStatuses(selected);
+    const statusesToStore = sanitized !== null ? sanitized : [];
+
+    try {
+      await storageSet(CUSTOM_SOUND_STATUS_STORAGE_KEY, statusesToStore);
+      applyCustomSoundEnabledStatuses(statusesToStore);
+
+      const statusKey = target.value;
+      const label = statusKey ? STATUS_LABELS[statusKey] ?? statusKey : null;
+
+      if (!statusesToStore.length) {
+        showNotificationStatusMessage("Custom Codex sounds are disabled.");
+      } else if (label) {
+        showNotificationStatusMessage(
+          target.checked
+            ? `${label} custom sound enabled.`
+            : `${label} custom sound disabled.`,
+        );
+      } else {
+        showNotificationStatusMessage("Custom Codex sound preference saved.");
+      }
+    } catch (error) {
+      console.error("Unable to save custom sound setting", error);
+      showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
+    }
+
+    return;
+  }
+
+  if (target instanceof HTMLSelectElement && target.name === "custom-sound-selection") {
+    const selectedSounds = readCustomSoundSelections();
+    const sanitized = sanitizeSoundSelections(selectedSounds);
+    const selectionsToStore = {
+      ...DEFAULT_CUSTOM_SOUND_SELECTIONS,
+      ...(sanitized ?? {}),
+    };
+
+    try {
+      await storageSet(CUSTOM_SOUND_SELECTION_STORAGE_KEY, selectionsToStore);
+      applyCustomSoundSelections(selectionsToStore);
+      showNotificationStatusMessage("Custom Codex sound choice saved.");
+    } catch (error) {
+      console.error("Unable to save custom sound selection", error);
       showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
     }
   }

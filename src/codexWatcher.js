@@ -3,6 +3,86 @@ const runtime =
     ? browser.runtime
     : chrome?.runtime;
 
+const SOUND_FILE_OPTIONS = [
+  "1.mp3",
+  "2.mp3",
+  "3.mp3",
+  "4.mp3",
+  "5.mp3",
+  "6.mp3",
+  "7.mp3",
+  "8.mp3",
+];
+const SOUND_FILE_SET = new Set(SOUND_FILE_OPTIONS);
+
+function getSoundAssetUrl(fileName) {
+  if (!fileName) {
+    return null;
+  }
+
+  try {
+    if (typeof runtime?.getURL === "function") {
+      return runtime.getURL(`src/sounds/${fileName}`);
+    }
+  } catch (error) {
+    console.warn("codex-autorun: failed to resolve sound asset", error);
+  }
+
+  if (typeof chrome !== "undefined" && typeof chrome.runtime?.getURL === "function") {
+    return chrome.runtime.getURL(`src/sounds/${fileName}`);
+  }
+
+  return `src/sounds/${fileName}`;
+}
+
+function playInjectedSound(fileName) {
+  if (typeof Audio !== "function") {
+    return;
+  }
+
+  if (!fileName || !SOUND_FILE_SET.has(fileName)) {
+    return;
+  }
+
+  const url = getSoundAssetUrl(fileName);
+  if (!url) {
+    return;
+  }
+
+  try {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    const playPromise = audio.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch((error) => {
+        console.warn("codex-autorun: failed to play injected sound", error);
+      });
+    }
+  } catch (error) {
+    console.warn("codex-autorun: failed to play injected sound", error);
+  }
+}
+
+if (runtime?.onMessage?.addListener) {
+  runtime.onMessage.addListener((message) => {
+    if (!message || typeof message !== "object") {
+      return;
+    }
+
+    if (message.type === "codex-play-sound") {
+      const fileName =
+        typeof message.fileName === "string" ? message.fileName.trim() : "";
+      if (!fileName) {
+        return;
+      }
+
+      if (SOUND_FILE_SET.has(fileName)) {
+        playInjectedSound(fileName);
+      }
+    }
+  });
+}
+
 const trackedTasks = new Map();
 const knownTaskNames = new Map();
 const pendingNameRefreshes = new Map();
