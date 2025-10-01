@@ -4,6 +4,49 @@ const storageApi =
     : typeof chrome !== "undefined" && chrome?.storage
       ? chrome.storage
       : null;
+const runtimeApi =
+  typeof browser !== "undefined" && browser?.runtime
+    ? browser.runtime
+    : typeof chrome !== "undefined" && chrome?.runtime
+      ? chrome.runtime
+      : null;
+
+const previewEditingSessions = new Map();
+
+if (runtimeApi?.onMessage && typeof runtimeApi.onMessage.addListener === "function") {
+  runtimeApi.onMessage.addListener((message, sender, sendResponse) => {
+    if (!message || message.type !== "codexPopupPreviewBounds") {
+      return undefined;
+    }
+    const sessionId = typeof message.sessionId === "string" ? message.sessionId : null;
+    if (!sessionId || !previewEditingSessions.has(sessionId)) {
+      if (typeof sendResponse === "function") {
+        try {
+          sendResponse({ success: false });
+        } catch (err) {
+          // Ignore sendResponse errors
+        }
+      }
+      return false;
+    }
+    const session = previewEditingSessions.get(sessionId);
+    if (session && typeof session.updateBounds === "function") {
+      try {
+        session.updateBounds(message.position ?? {}, message.size ?? {});
+      } catch (err) {
+        // Ignore errors updating bounds from preview message
+      }
+    }
+    if (typeof sendResponse === "function") {
+      try {
+        sendResponse({ success: true });
+      } catch (err) {
+        // Ignore sendResponse errors
+      }
+    }
+    return false;
+  });
+}
 
 const STATUS_OPTIONS = ["ready", "pr-created", "merged"];
 const STATUS_VALUES = new Set(STATUS_OPTIONS);
@@ -287,10 +330,6 @@ async function handleEditPopupPositionClick() {
   const statusEl = document.getElementById("popup-appearance-status");
   // Determine the runtime and windows APIs. We prefer the standard
   // browser API but fallback to chrome when necessary.
-  const runtimeApi =
-    (typeof browser !== "undefined" && browser?.runtime) ||
-    (typeof chrome !== "undefined" && chrome?.runtime) ||
-    null;
   const windowsApi =
     (typeof browser !== "undefined" && browser?.windows) ||
     (typeof chrome !== "undefined" && chrome?.windows) ||
@@ -305,10 +344,12 @@ async function handleEditPopupPositionClick() {
   // Build the URL for the preview window. Set edit=1 so the custom
   // notification page does not auto-close or play audio. Provide a
   // short message instructing the user to move the window.
+  const sessionId = `preview-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const params = new URLSearchParams();
   params.set("title", "Preview");
-  params.set("message", "Move + close to save position");
+  params.set("message", "Move and click here to save");
   params.set("edit", "1");
+  params.set("session", sessionId);
   // Pass through the currently selected colours to match the final
   // appearance. These override the defaults in the notification page.
   if (cachedPopupColors?.background) {
@@ -428,6 +469,23 @@ async function handleEditPopupPositionClick() {
         persistBounds(lastPosition, lastSize, { showSuccessMessage: false });
       }, 500);
     };
+    previewEditingSessions.set(sessionId, {
+      updateBounds(position = {}, size = {}) {
+        if (position && typeof position.left === "number") {
+          lastPosition.left = position.left;
+        }
+        if (position && typeof position.top === "number") {
+          lastPosition.top = position.top;
+        }
+        if (size && typeof size.width === "number") {
+          lastSize.width = size.width;
+        }
+        if (size && typeof size.height === "number") {
+          lastSize.height = size.height;
+        }
+        scheduleAutosave();
+      },
+    });
     const fetchWindowInfo = async (id) => {
       if (!windowsApi?.get || typeof windowsApi.get !== "function") {
         return null;
@@ -540,6 +598,7 @@ async function handleEditPopupPositionClick() {
       } catch (e) {
         // ignore errors removing listeners
       }
+      previewEditingSessions.delete(sessionId);
       try {
         if (autosaveTimeoutId !== null) {
           clearTimeout(autosaveTimeoutId);
@@ -561,6 +620,7 @@ async function handleEditPopupPositionClick() {
       statusEl.textContent = `Unable to open preview window: ${err.message}`;
       statusEl.classList.add("error");
     }
+    previewEditingSessions.delete(sessionId);
   }
 }
 let cachedNotificationStatuses = [...DEFAULT_NOTIFICATION_STATUSES];
