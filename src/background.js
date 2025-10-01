@@ -54,6 +54,7 @@ const DEFAULT_NOTIFICATION_POPUP_POSITION = { left: null, top: null };
 const DEFAULT_NOTIFICATION_POPUP_SIZE = { width: 360, height: 120 };
 const DEFAULT_NOTIFICATION_POPUP_COLORS = {
   background: "#f7fafc",
+  page: "#ffffff",
   text: "#1a1a1a",
 };
 let notificationPopupPosition = { ...DEFAULT_NOTIFICATION_POPUP_POSITION };
@@ -235,7 +236,7 @@ function sanitizePopupSize(value) {
 
 /**
  * Sanitize a stored popup colour configuration. Accepts objects with
- * `background` and `text` properties. Each value must be a valid CSS
+ * `background`, `page`, and `text` properties. Each value must be a valid CSS
  * colour string (we only accept hex colours like #rrggbb). Returns null
  * if the input is invalid.
  *
@@ -249,6 +250,9 @@ function sanitizePopupColors(value) {
   const result = {};
   if (typeof value.background === "string" && hexRegex.test(value.background)) {
     result.background = value.background;
+  }
+  if (typeof value.page === "string" && hexRegex.test(value.page)) {
+    result.page = value.page;
   }
   if (typeof value.text === "string" && hexRegex.test(value.text)) {
     result.text = value.text;
@@ -551,6 +555,9 @@ async function showStatusNotification(task, statusKey) {
   // have been added so they are included in the final URL.
   if (notificationPopupColors?.background) {
     params.set("bg", notificationPopupColors.background);
+  }
+  if (notificationPopupColors?.page) {
+    params.set("page", notificationPopupColors.page);
   }
   if (notificationPopupColors?.text) {
     params.set("text", notificationPopupColors.text);
