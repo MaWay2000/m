@@ -307,7 +307,7 @@ async function handleEditPopupPositionClick() {
   // short message instructing the user to move the window.
   const params = new URLSearchParams();
   params.set("title", "Preview");
-  params.set("message", "Move this window to choose position");
+  params.set("message", "Move + close to save position");
   params.set("edit", "1");
   // Pass through the currently selected colours to match the final
   // appearance. These override the defaults in the notification page.
