@@ -12,8 +12,6 @@ const NOTIFICATION_SOUND_SELECTION_STORAGE_KEY =
   "codexNotificationSoundSelections";
 const NOTIFICATION_SOUND_ENABLED_STORAGE_KEY =
   "codexNotificationSoundEnabledStatuses";
-const NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY =
-  "codexNotificationDefaultSoundMuted";
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "pr-created"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   ready: "1.mp3",
@@ -21,7 +19,6 @@ const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   merged: "1.mp3",
 };
 const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [...STATUS_OPTIONS];
-const DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED = false;
 const STATUS_LABELS = {
   ready: "Task ready to view",
   "pr-created": "PR created",
@@ -40,7 +37,6 @@ const SOUND_FILE_OPTIONS = [
 const SOUND_FILE_VALUES = new Set(SOUND_FILE_OPTIONS);
 let cachedNotificationStatuses = [...DEFAULT_NOTIFICATION_STATUSES];
 let cachedSoundEnabledStatuses = [...DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES];
-let cachedDefaultSoundMuted = DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED;
 
 function storageGet(key) {
   if (!storageApi?.local) {
@@ -154,33 +150,6 @@ function sanitizeSoundSelections(value) {
   return sanitized;
 }
 
-function sanitizeBoolean(value) {
-  if (value === true) {
-    return true;
-  }
-  if (value === false) {
-    return false;
-  }
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true") {
-      return true;
-    }
-    if (normalized === "false") {
-      return false;
-    }
-  }
-  if (typeof value === "number") {
-    if (value === 1) {
-      return true;
-    }
-    if (value === 0) {
-      return false;
-    }
-  }
-  return null;
-}
-
 function applyNotificationStatuses(statuses) {
   const form = document.getElementById("notification-preferences");
   if (!form) {
@@ -251,18 +220,6 @@ function applyNotificationSoundEnabledStatuses(statuses) {
   updateNotificationSoundSelectState();
 }
 
-function applyNotificationDefaultSoundMuted(isMuted) {
-  const checkbox = document.getElementById("notification-default-sound-muted");
-  if (!checkbox) {
-    return;
-  }
-
-  checkbox.checked = Boolean(isMuted);
-  cachedDefaultSoundMuted = Boolean(isMuted);
-  updateNotificationSoundToggleState();
-  updateNotificationSoundSelectState();
-}
-
 function updateNotificationSoundToggleState() {
   const form = document.getElementById("notification-preferences");
   if (!form) {
@@ -329,12 +286,10 @@ async function loadNotificationPreferences() {
       storedStatuses,
       storedSelections,
       storedSoundEnabledStatuses,
-      storedDefaultSoundMuted,
     ] = await Promise.all([
       storageGet(NOTIFICATION_STATUS_STORAGE_KEY),
       storageGet(NOTIFICATION_SOUND_SELECTION_STORAGE_KEY),
       storageGet(NOTIFICATION_SOUND_ENABLED_STORAGE_KEY),
-      storageGet(NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY),
     ]);
     const sanitizedStatuses = sanitizeNotificationStatuses(storedStatuses);
     const statuses =
@@ -357,13 +312,6 @@ async function loadNotificationPreferences() {
         : DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES;
     applyNotificationSoundEnabledStatuses(soundEnabledStatuses);
 
-    const sanitizedDefaultMuted = sanitizeBoolean(storedDefaultSoundMuted);
-    const defaultMuted =
-      sanitizedDefaultMuted !== null
-        ? sanitizedDefaultMuted
-        : DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED;
-    applyNotificationDefaultSoundMuted(defaultMuted);
-
     showNotificationStatusMessage("");
   } catch (error) {
     console.error("Unable to load notification preferences", error);
@@ -372,7 +320,6 @@ async function loadNotificationPreferences() {
     applyNotificationSoundEnabledStatuses(
       DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES,
     );
-    applyNotificationDefaultSoundMuted(DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED);
     showNotificationStatusMessage(`Unable to load preferences: ${error.message}`, true);
   }
 }
@@ -494,31 +441,6 @@ async function handleNotificationPreferencesChange(event) {
       }
     } catch (error) {
       console.error("Unable to save notification sound setting", error);
-      showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
-    }
-
-    return;
-  }
-
-  if (
-    target instanceof HTMLInputElement &&
-    target.name === "notification-default-sound-muted"
-  ) {
-    const isMuted = Boolean(target.checked);
-
-    try {
-      await storageSet(
-        NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY,
-        isMuted,
-      );
-      applyNotificationDefaultSoundMuted(isMuted);
-      showNotificationStatusMessage(
-        isMuted
-          ? "Default notification sound muted."
-          : "Default notification sound enabled.",
-      );
-    } catch (error) {
-      console.error("Unable to save default sound setting", error);
       showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
     }
 
