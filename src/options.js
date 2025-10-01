@@ -428,6 +428,36 @@ async function handleEditPopupPositionClick() {
         persistBounds(lastPosition, lastSize, { showSuccessMessage: false });
       }, 500);
     };
+    const fetchWindowInfo = async (id) => {
+      if (!windowsApi?.get || typeof windowsApi.get !== "function") {
+        return null;
+      }
+      try {
+        const result = windowsApi.get(id);
+        if (result && typeof result.then === "function") {
+          return await result;
+        }
+      } catch (err) {
+        // Some browsers (notably Chrome) throw when the callback is omitted.
+        // Fall back to the callback form below.
+      }
+      return new Promise((resolve) => {
+        try {
+          windowsApi.get(id, (info) => {
+            if (
+              typeof chrome !== "undefined" &&
+              chrome?.runtime?.lastError
+            ) {
+              resolve(null);
+              return;
+            }
+            resolve(info ?? null);
+          });
+        } catch (error) {
+          resolve(null);
+        }
+      });
+    };
     // Listener for bounds changes. Signature varies between browsers:
     // Firefox passes a Window object while Chrome may pass a windowId
     // followed by bounds. This handler accounts for both. When the event
@@ -472,17 +502,18 @@ async function handleEditPopupPositionClick() {
         };
         if (winInfo) {
           updateFromWin(winInfo);
-        } else if (windowsApi.get) {
-          try {
-            // Fetch asynchronously; ignore errors.
-            windowsApi.get(id).then((info) => {
-              updateFromWin(info);
-            });
-          } catch (e) {
-            // ignore
-          }
+          scheduleAutosave();
+          return;
         }
-        scheduleAutosave();
+        fetchWindowInfo(id)
+          .then((info) => {
+            if (info) {
+              updateFromWin(info);
+            }
+          })
+          .finally(() => {
+            scheduleAutosave();
+          });
       };
       windowsApi.onBoundsChanged.addListener(boundsListener);
     } else {
