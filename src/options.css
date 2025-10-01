@@ -171,21 +171,25 @@ main {
   align-items: flex-start;
 }
 
+
 .popup-colour-settings {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 0.5rem 0.75rem;
+  display: flex;
   align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .popup-colour-heading {
   font-size: 0.9rem;
   font-weight: 600;
   color: #1f2937;
-  grid-column: 1 / -1;
+  margin-right: 0.25rem;
 }
 
-.popup-colour-settings label {
+.popup-colour-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.9rem;
   color: #475569;
 }
