@@ -365,53 +365,63 @@ async function handleEditPopupPositionClick() {
     // Firefox passes a Window object while Chrome may pass a windowId
     // followed by bounds. This handler accounts for both. When the event
     // pertains to our preview window, update the lastPosition and lastSize.
-    const boundsListener = (...args) => {
-      // Determine the window ID and bounds from the event arguments.
-      let winInfo = null;
-      let id = null;
-      if (args.length && typeof args[0] === "object" && args[0] !== null) {
-        // Firefox: first arg is the window object.
-        winInfo = args[0];
-        id = winInfo.id;
-      } else if (args.length && typeof args[0] === "number") {
-        // Chrome: first arg is the windowId. Attempt to fetch details.
-        id = args[0];
-      }
-      if (id !== editingWindowId) {
-        return;
-      }
-      // If we did not receive the window object directly, retrieve it.
-      const updateFromWin = (info) => {
-        if (!info) {
+    let boundsListener = null;
+    if (
+      windowsApi.onBoundsChanged &&
+      typeof windowsApi.onBoundsChanged.addListener === "function"
+    ) {
+      boundsListener = (...args) => {
+        // Determine the window ID and bounds from the event arguments.
+        let winInfo = null;
+        let id = null;
+        if (args.length && typeof args[0] === "object" && args[0] !== null) {
+          // Firefox: first arg is the window object.
+          winInfo = args[0];
+          id = winInfo.id;
+        } else if (args.length && typeof args[0] === "number") {
+          // Chrome: first arg is the windowId. Attempt to fetch details.
+          id = args[0];
+        }
+        if (id !== editingWindowId) {
           return;
         }
-        if (typeof info.left === "number") {
-          lastPosition.left = info.left;
-        }
-        if (typeof info.top === "number") {
-          lastPosition.top = info.top;
-        }
-        if (typeof info.width === "number") {
-          lastSize.width = info.width;
-        }
-        if (typeof info.height === "number") {
-          lastSize.height = info.height;
+        // If we did not receive the window object directly, retrieve it.
+        const updateFromWin = (info) => {
+          if (!info) {
+            return;
+          }
+          if (typeof info.left === "number") {
+            lastPosition.left = info.left;
+          }
+          if (typeof info.top === "number") {
+            lastPosition.top = info.top;
+          }
+          if (typeof info.width === "number") {
+            lastSize.width = info.width;
+          }
+          if (typeof info.height === "number") {
+            lastSize.height = info.height;
+          }
+        };
+        if (winInfo) {
+          updateFromWin(winInfo);
+        } else if (windowsApi.get) {
+          try {
+            // Fetch asynchronously; ignore errors.
+            windowsApi.get(id).then((info) => {
+              updateFromWin(info);
+            });
+          } catch (e) {
+            // ignore
+          }
         }
       };
-      if (winInfo) {
-        updateFromWin(winInfo);
-      } else if (windowsApi.get) {
-        try {
-          // Fetch asynchronously; ignore errors.
-          windowsApi.get(id).then((info) => {
-            updateFromWin(info);
-          });
-        } catch (e) {
-          // ignore
-        }
-      }
-    };
-    windowsApi.onBoundsChanged.addListener(boundsListener);
+      windowsApi.onBoundsChanged.addListener(boundsListener);
+    } else {
+      console.warn(
+        "windows.onBoundsChanged API not available; popup position will only be saved when the window closes.",
+      );
+    }
     // Listener for when the preview window is closed. Finalise the
     // position and size by writing the last known bounds to storage and
     // updating local caches. Remove event listeners to avoid leaks.
@@ -420,7 +430,13 @@ async function handleEditPopupPositionClick() {
         return;
       }
       try {
-        windowsApi.onBoundsChanged.removeListener(boundsListener);
+        if (
+          boundsListener &&
+          windowsApi.onBoundsChanged &&
+          typeof windowsApi.onBoundsChanged.removeListener === "function"
+        ) {
+          windowsApi.onBoundsChanged.removeListener(boundsListener);
+        }
         windowsApi.onRemoved.removeListener(removedListener);
       } catch (e) {
         // ignore errors removing listeners
