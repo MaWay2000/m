@@ -52,7 +52,7 @@ const DEFAULT_NOTIFICATION_POPUP_COLORS = {
 };
 
 // Cached popup appearance values. These are populated from storage on
-// page load and updated when the user saves changes. Keeping local
+// page load and updated when the user changes the settings. Keeping local
 // copies avoids repeatedly reading from storage.
 let cachedPopupPosition = { ...DEFAULT_NOTIFICATION_POPUP_POSITION };
 let cachedPopupSize = { ...DEFAULT_NOTIFICATION_POPUP_SIZE };
@@ -233,31 +233,38 @@ async function loadPopupAppearancePreferences() {
  *
  * @returns {Promise<void>}
  */
-async function handleSavePopupColorsClick() {
+async function handlePopupColorChange() {
   const bgInput = document.getElementById("popup-bg-color");
   const textInput = document.getElementById("popup-text-color");
   const statusEl = document.getElementById("popup-appearance-status");
   if (!bgInput || !textInput) {
     return;
   }
-  const colorsToStore = {};
   const bgValue = String(bgInput.value || "").trim();
   const textValue = String(textInput.value || "").trim();
+  const colorsToStore = {};
   if (bgValue) {
     colorsToStore.background = bgValue;
   }
   if (textValue) {
     colorsToStore.text = textValue;
   }
+  const normalizedColors = {
+    ...DEFAULT_NOTIFICATION_POPUP_COLORS,
+    ...colorsToStore,
+  };
+  if (
+    cachedPopupColors.background === normalizedColors.background &&
+    cachedPopupColors.text === normalizedColors.text
+  ) {
+    return;
+  }
   try {
     await storageSet(NOTIFICATION_POPUP_COLORS_STORAGE_KEY, colorsToStore);
-    cachedPopupColors = {
-      ...DEFAULT_NOTIFICATION_POPUP_COLORS,
-      ...colorsToStore,
-    };
+    cachedPopupColors = normalizedColors;
     applyPopupColorInputs();
     if (statusEl) {
-      statusEl.textContent = "Popup colours saved.";
+      statusEl.textContent = "Popup colours updated.";
       statusEl.classList.remove("error");
     }
   } catch (err) {
@@ -1009,15 +1016,19 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // Load popup appearance settings and wire up controls. This ensures the
-  // colour inputs reflect stored values and the preview button and save
-  // colours button operate correctly.
+  // colour inputs reflect stored values and that updates are persisted as
+  // soon as the user selects new colours.
   loadPopupAppearancePreferences();
   const editPopupBtn = document.getElementById("edit-popup-position-btn");
   if (editPopupBtn) {
     editPopupBtn.addEventListener("click", handleEditPopupPositionClick);
   }
-  const savePopupColorsBtn = document.getElementById("save-popup-colors-btn");
-  if (savePopupColorsBtn) {
-    savePopupColorsBtn.addEventListener("click", handleSavePopupColorsClick);
+  const bgColorInput = document.getElementById("popup-bg-color");
+  if (bgColorInput) {
+    bgColorInput.addEventListener("change", handlePopupColorChange);
+  }
+  const textColorInput = document.getElementById("popup-text-color");
+  if (textColorInput) {
+    textColorInput.addEventListener("change", handlePopupColorChange);
   }
 });
