@@ -158,12 +158,15 @@
         <form id="popup-appearance-form">
           <div class="popup-controls">
             <button type="button" id="edit-popup-position-btn">Edit position and size</button>
-            <label for="popup-bg-color">Button background</label>
-            <input type="color" id="popup-bg-color" name="popup-bg-color" />
-            <label for="popup-page-color">Page background</label>
-            <input type="color" id="popup-page-color" name="popup-page-color" />
-            <label for="popup-text-color">Text colour</label>
-            <input type="color" id="popup-text-color" name="popup-text-color" />
+            <div class="popup-colour-settings">
+              <span class="popup-colour-heading">Popup colours:</span>
+              <label for="popup-bg-color">Button background</label>
+              <input type="color" id="popup-bg-color" name="popup-bg-color" />
+              <label for="popup-page-color">Page background</label>
+              <input type="color" id="popup-page-color" name="popup-page-color" />
+              <label for="popup-text-color">Text colour</label>
+              <input type="color" id="popup-text-color" name="popup-text-color" />
+            </div>
           </div>
         </form>
         <p class="hint" id="popup-appearance-status" role="status" aria-live="polite"></p>

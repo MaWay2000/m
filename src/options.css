@@ -166,17 +166,31 @@ main {
 /* Popup appearance controls */
 .popup-controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.popup-colour-settings {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.5rem 0.75rem;
   align-items: center;
 }
 
-.popup-controls label {
+.popup-colour-heading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+  grid-column: 1 / -1;
+}
+
+.popup-colour-settings label {
   font-size: 0.9rem;
   color: #475569;
 }
 
-.popup-controls input[type="color"] {
+.popup-colour-settings input[type="color"] {
   width: 2.5rem;
   height: 2rem;
   border: none;
