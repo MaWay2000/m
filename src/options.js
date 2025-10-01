@@ -466,7 +466,7 @@ async function handleEditPopupPositionClick() {
           ...sizeToStore,
         };
         if (showSuccessMessage && statusEl) {
-          statusEl.textContent = "Popup position and size saved.";
+          statusEl.textContent = "Popup position and size updated.";
           statusEl.classList.remove("error");
         }
       } catch (err) {
@@ -594,7 +594,7 @@ async function handleEditPopupPositionClick() {
       windowsApi.onBoundsChanged.addListener(boundsListener);
     } else {
       console.warn(
-        "windows.onBoundsChanged API not available; popup position will only be saved when the window closes.",
+        "windows.onBoundsChanged API not available; popup position will only be stored when the window closes.",
       );
     }
     // Listener for when the preview window is closed. Finalise the
@@ -1073,7 +1073,7 @@ async function handleNotificationPreferencesChange(event) {
       await storageSet(NOTIFICATION_STATUS_STORAGE_KEY, statusesToStore);
       applyNotificationStatuses(statusesToStore);
       if (statusesToStore.length) {
-        showNotificationStatusMessage("Preferences saved.");
+        showNotificationStatusMessage("Preferences updated.");
       } else {
         showNotificationStatusMessage("Browser notifications are disabled.");
       }
@@ -1111,7 +1111,7 @@ async function handleNotificationPreferencesChange(event) {
             : `${label} sound disabled.`,
         );
       } else {
-        showNotificationStatusMessage("Sound preference saved.");
+        showNotificationStatusMessage("Sound preference updated.");
       }
     } catch (error) {
       console.error("Unable to save notification sound setting", error);
@@ -1137,7 +1137,7 @@ async function handleNotificationPreferencesChange(event) {
         selectionsToStore,
       );
       applyNotificationSoundSelections(selectionsToStore);
-      showNotificationStatusMessage("Sound choice saved.");
+      showNotificationStatusMessage("Sound choice updated.");
     } catch (error) {
       console.error("Unable to save notification sound selection", error);
       showNotificationStatusMessage(`Unable to save preferences: ${error.message}`, true);
