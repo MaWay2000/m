@@ -368,6 +368,66 @@ async function handleEditPopupPositionClick() {
     // the existing cached values so unchanged coordinates persist.
     let lastPosition = { ...cachedPopupPosition };
     let lastSize = { ...cachedPopupSize };
+    let autosaveTimeoutId = null;
+
+    const persistBounds = async (
+      position,
+      size,
+      { showSuccessMessage = true } = {},
+    ) => {
+      const positionToStore = {};
+      if (typeof position.left === "number") {
+        positionToStore.left = position.left;
+      }
+      if (typeof position.top === "number") {
+        positionToStore.top = position.top;
+      }
+      const sizeToStore = {};
+      if (typeof size.width === "number") {
+        sizeToStore.width = size.width;
+      }
+      if (typeof size.height === "number") {
+        sizeToStore.height = size.height;
+      }
+
+      try {
+        await Promise.all([
+          storageSet(
+            NOTIFICATION_POPUP_POSITION_STORAGE_KEY,
+            positionToStore,
+          ),
+          storageSet(NOTIFICATION_POPUP_SIZE_STORAGE_KEY, sizeToStore),
+        ]);
+        cachedPopupPosition = {
+          ...DEFAULT_NOTIFICATION_POPUP_POSITION,
+          ...positionToStore,
+        };
+        cachedPopupSize = {
+          ...DEFAULT_NOTIFICATION_POPUP_SIZE,
+          ...sizeToStore,
+        };
+        if (showSuccessMessage && statusEl) {
+          statusEl.textContent = "Popup position and size saved.";
+          statusEl.classList.remove("error");
+        }
+      } catch (err) {
+        console.error("Failed to save popup bounds", err);
+        if (statusEl) {
+          statusEl.textContent = `Unable to save popup bounds: ${err.message}`;
+          statusEl.classList.add("error");
+        }
+      }
+    };
+
+    const scheduleAutosave = () => {
+      if (autosaveTimeoutId !== null) {
+        return;
+      }
+      autosaveTimeoutId = setTimeout(() => {
+        autosaveTimeoutId = null;
+        persistBounds(lastPosition, lastSize, { showSuccessMessage: false });
+      }, 500);
+    };
     // Listener for bounds changes. Signature varies between browsers:
     // Firefox passes a Window object while Chrome may pass a windowId
     // followed by bounds. This handler accounts for both. When the event
@@ -422,6 +482,7 @@ async function handleEditPopupPositionClick() {
             // ignore
           }
         }
+        scheduleAutosave();
       };
       windowsApi.onBoundsChanged.addListener(boundsListener);
     } else {
@@ -449,37 +510,11 @@ async function handleEditPopupPositionClick() {
         // ignore errors removing listeners
       }
       try {
-        const positionToStore = {};
-        if (typeof lastPosition.left === "number") {
-          positionToStore.left = lastPosition.left;
+        if (autosaveTimeoutId !== null) {
+          clearTimeout(autosaveTimeoutId);
+          autosaveTimeoutId = null;
         }
-        if (typeof lastPosition.top === "number") {
-          positionToStore.top = lastPosition.top;
-        }
-        const sizeToStore = {};
-        if (typeof lastSize.width === "number") {
-          sizeToStore.width = lastSize.width;
-        }
-        if (typeof lastSize.height === "number") {
-          sizeToStore.height = lastSize.height;
-        }
-        await Promise.all([
-          storageSet(NOTIFICATION_POPUP_POSITION_STORAGE_KEY, positionToStore),
-          storageSet(NOTIFICATION_POPUP_SIZE_STORAGE_KEY, sizeToStore),
-        ]);
-        // Update caches and UI.
-        cachedPopupPosition = {
-          ...DEFAULT_NOTIFICATION_POPUP_POSITION,
-          ...positionToStore,
-        };
-        cachedPopupSize = {
-          ...DEFAULT_NOTIFICATION_POPUP_SIZE,
-          ...sizeToStore,
-        };
-        if (statusEl) {
-          statusEl.textContent = "Popup position and size saved.";
-          statusEl.classList.remove("error");
-        }
+        await persistBounds(lastPosition, lastSize, { showSuccessMessage: true });
       } catch (err) {
         console.error("Failed to save popup bounds", err);
         if (statusEl) {
