@@ -14,10 +14,12 @@
       bgColor: params.get("bg") || "",
       textColor: params.get("text") || "",
       edit: params.get("edit") === "1" || params.get("edit") === "true",
+      sessionId: params.get("session") || "",
     };
   }
 
-  const { title, message, audio, clickUrl, bgColor, textColor, edit } = getQueryParams();
+  const { title, message, audio, clickUrl, bgColor, textColor, edit, sessionId } =
+    getQueryParams();
 
   // Populate the notification title and message elements. Using innerText
   // avoids interpreting any potential HTML in the message string.
@@ -80,29 +82,91 @@
     }
   }
 
-  // Handle clicks on the notification when not in edit mode. If a click URL
-  // is provided and the extension has tab permissions, open the URL in a new
-  // tab and close the window. When editing, clicks should not close the
-  // window or launch any URL so the user can reposition it without
-  // interference.
+  // Handle clicks on the notification. In edit mode, clicking captures the
+  // current bounds and notifies the options page before closing so the new
+  // position persists. Outside edit mode the click behaves as before: open
+  // the target URL (if any) and close the window.
   const root = document.getElementById("notification-root");
+  const runtimeApi =
+    (typeof browser !== "undefined" && browser?.runtime)
+      ? browser.runtime
+      : typeof chrome !== "undefined" && chrome?.runtime
+        ? chrome.runtime
+        : null;
+
   if (root) {
-    root.addEventListener("click", () => {
-      if (!edit) {
-        if (clickUrl) {
+    root.addEventListener("click", async () => {
+      if (edit) {
+        const position = {};
+        const size = {};
+        const left = Number.isFinite(window.screenX)
+          ? window.screenX
+          : Number.isFinite(window.screenLeft)
+            ? window.screenLeft
+            : null;
+        const top = Number.isFinite(window.screenY)
+          ? window.screenY
+          : Number.isFinite(window.screenTop)
+            ? window.screenTop
+            : null;
+        const width = Number.isFinite(window.outerWidth)
+          ? window.outerWidth
+          : Number.isFinite(window.innerWidth)
+            ? window.innerWidth
+            : null;
+        const height = Number.isFinite(window.outerHeight)
+          ? window.outerHeight
+          : Number.isFinite(window.innerHeight)
+            ? window.innerHeight
+            : null;
+        if (typeof left === "number") {
+          position.left = Math.round(left);
+        }
+        if (typeof top === "number") {
+          position.top = Math.round(top);
+        }
+        if (typeof width === "number") {
+          size.width = Math.round(width);
+        }
+        if (typeof height === "number") {
+          size.height = Math.round(height);
+        }
+        if (sessionId && runtimeApi?.sendMessage) {
           try {
-            const apiTabs =
-              (typeof browser !== "undefined" && browser?.tabs) ||
-              (typeof chrome !== "undefined" && chrome?.tabs);
-            if (apiTabs && apiTabs.create) {
-              apiTabs.create({ url: clickUrl });
+            const response = runtimeApi.sendMessage({
+              type: "codexPopupPreviewBounds",
+              sessionId,
+              position,
+              size,
+            });
+            if (response && typeof response.then === "function") {
+              await response.catch(() => {});
             }
           } catch (err) {
-            // Ignore errors opening new tabs; still close the window.
+            // Ignore errors reporting bounds; closing still triggers the usual save path.
           }
         }
-        window.close();
+        try {
+          window.close();
+        } catch (err) {
+          // Ignore close errors; the window may already be closing.
+        }
+        return;
       }
+
+      if (clickUrl) {
+        try {
+          const apiTabs =
+            (typeof browser !== "undefined" && browser?.tabs) ||
+            (typeof chrome !== "undefined" && chrome?.tabs);
+          if (apiTabs && apiTabs.create) {
+            apiTabs.create({ url: clickUrl });
+          }
+        } catch (err) {
+          // Ignore errors opening new tabs; still close the window.
+        }
+      }
+      window.close();
     });
   }
 })();
