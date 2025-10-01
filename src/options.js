@@ -64,7 +64,7 @@ const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
 const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [...STATUS_OPTIONS];
 const STATUS_LABELS = {
   ready: "Task ready to view",
-  "pr-created": "PR created",
+  "pr-created": "PR ready to view",
   merged: "Merged",
 };
 const SOUND_FILE_OPTIONS = [

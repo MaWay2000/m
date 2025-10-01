@@ -445,7 +445,7 @@ function formatStatusLabel(status) {
     return "Working";
   }
   if (normalized.toLowerCase() === "pr-created") {
-    return "PR created";
+    return "PR ready to view";
   }
   const words = normalized
     .replace(/[_-]+/g, " ")

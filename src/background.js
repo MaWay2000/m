@@ -87,7 +87,7 @@ const IGNORED_NAME_PATTERNS = [
 ];
 const STATUS_LABELS = {
   ready: "Task ready to view",
-  "pr-created": "PR created",
+  "pr-created": "PR ready to view",
   merged: "Merged",
 };
 
@@ -1190,7 +1190,7 @@ async function markTaskAsPrCreated(task) {
   const nextHistory = [...history];
   nextHistory[index] = updated;
   await storageSet(HISTORY_KEY, nextHistory);
-  console.log("Marked Codex task as PR created", updated);
+  console.log("Marked Codex task as PR ready to view", updated);
 }
 
 async function autoHandleReadyTask(task) {
