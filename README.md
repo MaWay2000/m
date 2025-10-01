@@ -13,7 +13,7 @@ This repository contains the codex-autorun Firefox-compatible WebExtension with 
 
 ## Popup workflow
 
-When a tracked task leaves the "working" state, the popup now highlights it as **Task ready to view** and provides a **Create PR** action. Clicking the button opens the original task link in a new tab and marks the stored status as **PR created** so you can track which tasks already have pull requests in flight. All other tasks expose an **Open task** action for quick access to their Codex links.
+When a tracked task leaves the "working" state, the popup now highlights it as **Task ready to view** and provides a **Create PR** action. Clicking the button opens the original task link in a new tab and marks the stored status as **PR ready to view** so you can track which tasks already have pull requests in flight. All other tasks expose an **Open task** action for quick access to their Codex links.
 
 ## Load the extension in Firefox
 

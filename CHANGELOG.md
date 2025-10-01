@@ -1,5 +1,11 @@
 # Changelog
 
+# 1.1.23 - 2025-09-30
+
+- Renamed the **PR created** status label to **PR ready to view** across the
+  extension, ensuring notifications, logs, and settings all reflect the updated
+  wording.
+
 # 1.1.22 - 2025-09-30
 
 - **Manifest fix for Firefox:** The previous release added a `windows` permission
@@ -106,16 +112,16 @@
 - Added Firefox toolbar icon assets and wired them up in the manifest so the button renders again.
 
 # 1.1.4 - 2025-09-28
-- Restore automatic handling of ready Codex tasks by opening them in a new tab and marking them as PR created without opening the popup.
+- Restore automatic handling of ready Codex tasks by opening them in a new tab and marking them as PR ready to view without opening the popup.
 
 # 1.1.3 - 2025-09-28
 - Automatically click the Codex **Create PR** button after opening ready tasks in a new tab.
 
 # 1.1.2 - 2025-09-28
-- Automated the **Create PR** action for ready tasks and update their status to **PR created** when successful.
+- Automated the **Create PR** action for ready tasks and update their status to **PR ready to view** when successful.
 
 # 1.1.1 - 2025-09-28
-- Added popup actions to open ready tasks, trigger the "Create PR" workflow, and mark the status as PR created.
+- Added popup actions to open ready tasks, trigger the "Create PR" workflow, and mark the status as PR ready to view.
 - Introduced new styling for task actions and status badges.
 - Granted the extension permission to open task links in new tabs.
 
