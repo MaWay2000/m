@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>codex-autorun settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <h1>codex-autorun settings</h1>
+        <p>Adjust extension preferences.</p>
+      </header>
+      <section class="card" aria-labelledby="browser-notifications-title">
+        <div class="card-header">
+          <h2 id="browser-notifications-title">Browser notifications</h2>
+        </div>
+        <p class="hint">
+          Choose which task status changes should trigger a browser notification.
+        </p>
+        <form id="notification-preferences">
+          <div class="default-sound-setting">
+            <label class="checkbox-option" for="notification-default-sound-muted">
+              <input
+                type="checkbox"
+                name="notification-default-sound-muted"
+                id="notification-default-sound-muted"
+              />
+              Mute default notification sound
+            </label>
+            <p class="hint">
+              Stop playing the built-in sound until you pick a custom alert.
+            </p>
+          </div>
+          <fieldset>
+            <legend class="fieldset-title">
+              Show a notification when a task becomes:
+            </legend>
+            <div class="checkbox-list">
+              <div class="sound-option">
+                <label class="checkbox-option">
+                  <input type="checkbox" name="notification-status" value="ready" />
+                  Task ready to view
+                </label>
+                <div class="sound-controls">
+                  <label class="sound-toggle">
+                    <input
+                      type="checkbox"
+                      name="notification-sound-enabled"
+                      data-status="ready"
+                      checked
+                    />
+                    Play sound
+                  </label>
+                  <label class="sound-select">
+                    <select
+                      name="notification-sound-selection"
+                      data-status="ready"
+                      aria-label="Sound"
+                    >
+                      <option value="1.mp3">Sound 1</option>
+                      <option value="2.mp3">Sound 2</option>
+                      <option value="3.mp3">Sound 3</option>
+                      <option value="4.mp3">Sound 4</option>
+                      <option value="5.mp3">Sound 5</option>
+                      <option value="6.mp3">Sound 6</option>
+                      <option value="7.mp3">Sound 7</option>
+                      <option value="8.mp3">Sound 8</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div class="sound-option">
+                <label class="checkbox-option">
+                  <input type="checkbox" name="notification-status" value="pr-created" />
+                  PR created
+                </label>
+                <div class="sound-controls">
+                  <label class="sound-toggle">
+                    <input
+                      type="checkbox"
+                      name="notification-sound-enabled"
+                      data-status="pr-created"
+                      checked
+                    />
+                    Play sound
+                  </label>
+                  <label class="sound-select">
+                    <select
+                      name="notification-sound-selection"
+                      data-status="pr-created"
+                      aria-label="Sound"
+                    >
+                      <option value="1.mp3">Sound 1</option>
+                      <option value="2.mp3">Sound 2</option>
+                      <option value="3.mp3">Sound 3</option>
+                      <option value="4.mp3">Sound 4</option>
+                      <option value="5.mp3">Sound 5</option>
+                      <option value="6.mp3">Sound 6</option>
+                      <option value="7.mp3">Sound 7</option>
+                      <option value="8.mp3">Sound 8</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div class="sound-option">
+                <label class="checkbox-option">
+                  <input type="checkbox" name="notification-status" value="merged" />
+                  Merged
+                </label>
+                <div class="sound-controls">
+                  <label class="sound-toggle">
+                    <input
+                      type="checkbox"
+                      name="notification-sound-enabled"
+                      data-status="merged"
+                      checked
+                    />
+                    Play sound
+                  </label>
+                  <label class="sound-select">
+                    <select
+                      name="notification-sound-selection"
+                      data-status="merged"
+                      aria-label="Sound"
+                    >
+                      <option value="1.mp3">Sound 1</option>
+                      <option value="2.mp3">Sound 2</option>
+                      <option value="3.mp3">Sound 3</option>
+                      <option value="4.mp3">Sound 4</option>
+                      <option value="5.mp3">Sound 5</option>
+                      <option value="6.mp3">Sound 6</option>
+                      <option value="7.mp3">Sound 7</option>
+                      <option value="8.mp3">Sound 8</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </fieldset>
+        </form>
+        <p
+          class="hint"
+          id="notification-status-message"
+          role="status"
+          aria-live="polite"
+        ></p>
+
+        <!-- Test notification button -->
+        <div class="test-notification">
+          <!--
+            A button that triggers a sample notification using the current
+            notification settings. It is disabled while sending the test
+            and re-enabled afterwards. The handler is wired up in
+            options.js.
+          -->
+          <button type="button" id="test-notification-btn">Test notification</button>
+        </div>
+      </section>
+
+      <!-- Popup appearance configuration -->
+      <section class="card" aria-labelledby="popup-appearance-title">
+        <div class="card-header">
+          <h2 id="popup-appearance-title">Notification popup appearance</h2>
+        </div>
+        <p class="hint">
+          Adjust where the popup appears on screen, its size and colours. To set the
+          position and size, click <strong>Edit position and size</strong> and move the
+          preview window. Close the preview to save your changes.
+        </p>
+        <form id="popup-appearance-form">
+          <div class="popup-controls">
+            <button type="button" id="edit-popup-position-btn">Edit position and size</button>
+            <label for="popup-bg-color">Background colour</label>
+            <input type="color" id="popup-bg-color" name="popup-bg-color" />
+            <label for="popup-text-color">Text colour</label>
+            <input type="color" id="popup-text-color" name="popup-text-color" />
+            <button type="button" id="save-popup-colors-btn">Save colours</button>
+          </div>
+        </form>
+        <p class="hint" id="popup-appearance-status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
