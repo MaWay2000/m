@@ -12,13 +12,24 @@
       audio: params.get("audio") || "",
       clickUrl: params.get("clickUrl") || "",
       bgColor: params.get("bg") || "",
+      pageColor: params.get("page") || "",
       textColor: params.get("text") || "",
       edit: params.get("edit") === "1" || params.get("edit") === "true",
       sessionId: params.get("session") || "",
     };
   }
 
-  const { title, message, audio, clickUrl, bgColor, textColor, edit, sessionId } =
+  const {
+    title,
+    message,
+    audio,
+    clickUrl,
+    bgColor,
+    pageColor,
+    textColor,
+    edit,
+    sessionId,
+  } =
     getQueryParams();
 
   // Populate the notification title and message elements. Using innerText
@@ -28,9 +39,14 @@
   if (titleEl) titleEl.innerText = title;
   if (messageEl) messageEl.innerText = message;
 
-  // Apply custom colours if provided. The caller can pass `bg` and `text` query
-  // parameters containing CSS colour values (e.g. "#ffffff"). These values
-  // override the default appearance of the notification container.
+  // Apply custom colours if provided. The caller can pass `bg`, `page`, and
+  // `text` query parameters containing CSS colour values (e.g. "#ffffff"). These
+  // values override the default appearance of the notification container and
+  // surrounding page.
+  if (pageColor) {
+    document.documentElement.style.backgroundColor = pageColor;
+    document.body.style.backgroundColor = pageColor;
+  }
   const rootEl = document.getElementById("notification-root");
   if (rootEl) {
     if (bgColor) {

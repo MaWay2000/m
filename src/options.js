@@ -91,6 +91,7 @@ const DEFAULT_NOTIFICATION_POPUP_POSITION = { left: null, top: null };
 const DEFAULT_NOTIFICATION_POPUP_SIZE = { width: 360, height: 120 };
 const DEFAULT_NOTIFICATION_POPUP_COLORS = {
   background: "#f7fafc",
+  page: "#ffffff",
   text: "#1a1a1a",
 };
 
@@ -168,9 +169,9 @@ function sanitizePopupSizeOption(value) {
 
 /**
  * Sanitize a stored popup colour configuration. Accepts objects with
- * `background` and `text` properties. Each value must be a valid CSS
+ * `background`, `page`, and `text` properties. Each value must be a valid CSS
  * hex colour string (e.g. "#ffffff" or "#abc"). Returns null if the
- * input is invalid or missing both values.
+ * input is invalid or missing all values.
  *
  * @param {any} value
  * @returns {object|null}
@@ -183,6 +184,9 @@ function sanitizePopupColorOption(value) {
   const result = {};
   if (typeof value.background === "string" && hexRegex.test(value.background)) {
     result.background = value.background;
+  }
+  if (typeof value.page === "string" && hexRegex.test(value.page)) {
+    result.page = value.page;
   }
   if (typeof value.text === "string" && hexRegex.test(value.text)) {
     result.text = value.text;
@@ -198,10 +202,15 @@ function sanitizePopupColorOption(value) {
  */
 function applyPopupColorInputs() {
   const bgInput = document.getElementById("popup-bg-color");
+  const pageInput = document.getElementById("popup-page-color");
   const textInput = document.getElementById("popup-text-color");
   if (bgInput) {
     bgInput.value =
       cachedPopupColors?.background || DEFAULT_NOTIFICATION_POPUP_COLORS.background;
+  }
+  if (pageInput) {
+    pageInput.value =
+      cachedPopupColors?.page || DEFAULT_NOTIFICATION_POPUP_COLORS.page;
   }
   if (textInput) {
     textInput.value =
@@ -278,16 +287,21 @@ async function loadPopupAppearancePreferences() {
  */
 async function handlePopupColorChange() {
   const bgInput = document.getElementById("popup-bg-color");
+  const pageInput = document.getElementById("popup-page-color");
   const textInput = document.getElementById("popup-text-color");
   const statusEl = document.getElementById("popup-appearance-status");
-  if (!bgInput || !textInput) {
+  if (!bgInput || !pageInput || !textInput) {
     return;
   }
   const bgValue = String(bgInput.value || "").trim();
+  const pageValue = String(pageInput.value || "").trim();
   const textValue = String(textInput.value || "").trim();
   const colorsToStore = {};
   if (bgValue) {
     colorsToStore.background = bgValue;
+  }
+  if (pageValue) {
+    colorsToStore.page = pageValue;
   }
   if (textValue) {
     colorsToStore.text = textValue;
@@ -298,6 +312,7 @@ async function handlePopupColorChange() {
   };
   if (
     cachedPopupColors.background === normalizedColors.background &&
+    cachedPopupColors.page === normalizedColors.page &&
     cachedPopupColors.text === normalizedColors.text
   ) {
     return;
@@ -354,6 +369,9 @@ async function handleEditPopupPositionClick() {
   // appearance. These override the defaults in the notification page.
   if (cachedPopupColors?.background) {
     params.set("bg", cachedPopupColors.background);
+  }
+  if (cachedPopupColors?.page) {
+    params.set("page", cachedPopupColors.page);
   }
   if (cachedPopupColors?.text) {
     params.set("text", cachedPopupColors.text);
