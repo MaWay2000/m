@@ -13,6 +13,12 @@ const AUTO_CLICK_INTERVAL_MS = 500;
 const NAME_REFRESH_INTERVAL_MS = 60 * 1000;
 const MAX_NAME_REFRESH_ATTEMPTS = 30;
 const MAX_NAME_REFRESH_MISSES = 30;
+const VIEW_PR_TEXT_PATTERNS = [
+  "view pr",
+  "view pull request",
+  "pr ready",
+  "pull request ready",
+];
 const WORKING_TASK_MISSING_GRACE_MS = 15 * 60 * 1000;
 
 function isTransparentColor(color) {
@@ -723,7 +729,57 @@ function scanForTasks() {
       link.closest('[data-testid*="task" i], article, li, section, div') ??
       link.parentElement ??
       link;
-    const indicator = findIndicatorElement(container);
+    const viewPrButton = findViewPrButton(container);
+    const indicator = viewPrButton ? null : findIndicatorElement(container);
+    if (viewPrButton) {
+      const tracked = trackedTasks.get(taskId);
+      const pendingRefresh = pendingNameRefreshes.get(taskId);
+      pendingNameRefreshes.delete(taskId);
+      if (tracked) {
+        trackedTasks.delete(taskId);
+        if (tracked?.name) {
+          rememberTaskName(taskId, tracked.name);
+        }
+      }
+      const extractedName = extractTaskName(container, link);
+      if (extractedName) {
+        rememberTaskName(taskId, extractedName);
+      }
+      let storedName =
+        knownTaskNames.get(taskId) ??
+        extractedName ??
+        tracked?.name ??
+        pendingRefresh?.lastKnownName ??
+        null;
+      if (!storedName) {
+        storedName = `Task ${taskId}`;
+      }
+      rememberTaskName(taskId, storedName);
+      const url =
+        extractTaskUrl(link) ??
+        tracked?.url ??
+        pendingRefresh?.url ??
+        null;
+      const startedAt = tracked?.startedAt ?? pendingRefresh?.startedAt ?? null;
+      const completedAt =
+        pendingRefresh?.completedAt ?? new Date().toISOString();
+      const updatePayload = {
+        id: taskId,
+        status: "pr-created",
+        completedAt,
+      };
+      if (storedName) {
+        updatePayload.name = storedName;
+      }
+      if (url) {
+        updatePayload.url = url;
+      }
+      if (startedAt) {
+        updatePayload.startedAt = startedAt;
+      }
+      notifyTaskUpdate(updatePayload);
+      continue;
+    }
     if (indicator) {
       pendingNameRefreshes.delete(taskId);
       if (!trackedTasks.has(taskId)) {
@@ -1020,6 +1076,114 @@ function isElementVisible(element) {
     return true;
   }
   return rect.width > 0 && rect.height > 0;
+}
+
+function findViewPrButtonInRoot(root) {
+  if (!root?.querySelectorAll) {
+    return null;
+  }
+
+  const explicitSelectors = [
+    "[data-testid*='view-pr' i]",
+    "[data-testid*='viewpr' i]",
+    "[data-testid*='view-pull' i]",
+    "[data-testid*='pr-ready' i]",
+    "[data-testid*='view-github-pr' i]",
+    "button.view-pr",
+    "a.view-pr",
+    "button[data-variant*='view-pr' i]",
+    "a[data-variant*='view-pr' i]",
+  ];
+
+  for (const selector of explicitSelectors) {
+    const candidate = root.querySelector(selector);
+    if (candidate && isElementVisible(candidate)) {
+      return candidate;
+    }
+  }
+
+  const githubLinkSelectors = [
+    "a[href*='github.com'][href*='/pull/']",
+    "a[href*='/pull/'][data-testid*='pr' i]",
+  ];
+
+  for (const selector of githubLinkSelectors) {
+    const candidates = root.querySelectorAll(selector);
+    for (const candidate of candidates) {
+      if (candidate && isElementVisible(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  const candidates = root.querySelectorAll("button, a, [role='button']");
+  for (const candidate of candidates) {
+    if (!isElementVisible(candidate)) {
+      continue;
+    }
+    for (const pattern of VIEW_PR_TEXT_PATTERNS) {
+      if (elementTextMatches(candidate, pattern)) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+function findViewPrButton(container) {
+  if (!container) {
+    return null;
+  }
+
+  const visitedRoots = new Set();
+  const queue = [];
+
+  const enqueueRoot = (root) => {
+    if (!root || visitedRoots.has(root) || typeof root.querySelectorAll !== "function") {
+      return;
+    }
+    visitedRoots.add(root);
+    queue.push(root);
+  };
+
+  enqueueRoot(container);
+
+  const containerRoot = container.getRootNode?.();
+  if (containerRoot && containerRoot !== container) {
+    enqueueRoot(containerRoot);
+  }
+
+  if (container instanceof Element) {
+    let ancestor = container.parentElement;
+    let depth = 0;
+    while (ancestor && depth < 6) {
+      enqueueRoot(ancestor);
+      const ancestorRoot = ancestor.getRootNode?.();
+      if (ancestorRoot && ancestorRoot !== ancestor) {
+        enqueueRoot(ancestorRoot);
+      }
+      ancestor = ancestor.parentElement;
+      depth += 1;
+    }
+  }
+
+  while (queue.length) {
+    const root = queue.shift();
+    const match = findViewPrButtonInRoot(root);
+    if (match) {
+      return match;
+    }
+    const elements = typeof root.querySelectorAll === "function" ? root.querySelectorAll("*") : [];
+    for (const element of elements) {
+      const shadowRoot = element?.shadowRoot;
+      if (shadowRoot && !visitedRoots.has(shadowRoot)) {
+        enqueueRoot(shadowRoot);
+      }
+    }
+  }
+
+  return null;
 }
 
 function findCreatePrButtonInRoot(root) {
