@@ -1,0 +1,4 @@
+Test file 4
+==========
+
+This placeholder file exists so automated checks can confirm that text-only assets are properly tracked in the repository.

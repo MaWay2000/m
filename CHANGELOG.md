@@ -1,5 +1,10 @@
 # Changelog
 
+# 1.1.24 - 2025-09-30
+
+- Added `test4.txt`, a placeholder text asset used to verify repository
+  updates that include simple documentation files.
+
 # 1.1.23 - 2025-09-30
 
 - Renamed the **PR created** status label to **PR ready to view** across the
