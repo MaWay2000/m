@@ -49,53 +49,6 @@
   let confirmAttempts = 0;
   let mergeIntervalId = null;
   let confirmIntervalId = null;
-  let automationCancelled = false;
-
-  const USER_CANCEL_EVENT_TYPES = ["pointerdown", "keydown", "wheel"]; // Triggers that opt out of auto-merge
-
-  function stopMergeInterval() {
-    if (mergeIntervalId !== null) {
-      clearInterval(mergeIntervalId);
-      mergeIntervalId = null;
-    }
-  }
-
-  function stopConfirmInterval() {
-    if (confirmIntervalId !== null) {
-      clearInterval(confirmIntervalId);
-      confirmIntervalId = null;
-    }
-  }
-
-  function handleUserCancel(event) {
-    const type = event?.type || "unknown";
-    cancelMergeAutomation(`user interaction: ${type}`);
-  }
-
-  function removeUserCancelListeners() {
-    for (const type of USER_CANCEL_EVENT_TYPES) {
-      window.removeEventListener(type, handleUserCancel, true);
-    }
-  }
-
-  function cancelMergeAutomation(reason) {
-    if (automationCancelled) {
-      return;
-    }
-    automationCancelled = true;
-    mergePrEnabled = false;
-    confirmMergeEnabled = false;
-    closeAfterEnabled = false;
-    stopMergeInterval();
-    stopConfirmInterval();
-    removeUserCancelListeners();
-    const suffix = reason ? ` (${reason})` : "";
-    console.log(`codex-autorun: merge automation cancelled${suffix}.`);
-  }
-
-  for (const type of USER_CANCEL_EVENT_TYPES) {
-    window.addEventListener(type, handleUserCancel, true);
-  }
 
   function findButtonWithText(text) {
     const lc = text.toLowerCase();
@@ -206,13 +159,11 @@
     if (mergeIntervalId !== null) {
       return;
     }
-    if (automationCancelled) {
-      return;
-    }
     mergeIntervalId = window.setInterval(() => {
-      if (!mergePrEnabled || automationCancelled) {
+      if (!mergePrEnabled) {
         // If the preference is disabled stop trying
-        stopMergeInterval();
+        clearInterval(mergeIntervalId);
+        mergeIntervalId = null;
         return;
       }
       mergeAttempts += 1;
@@ -220,11 +171,13 @@
       if (btn) {
         const clicked = clickButton(btn, 'Merge pull request button');
         if (clicked) {
-          stopMergeInterval();
+          clearInterval(mergeIntervalId);
+          mergeIntervalId = null;
         }
       }
       if (mergeAttempts >= MAX_ATTEMPTS) {
-        stopMergeInterval();
+        clearInterval(mergeIntervalId);
+        mergeIntervalId = null;
       }
     }, 1000);
   }
@@ -233,12 +186,10 @@
     if (confirmIntervalId !== null) {
       return;
     }
-    if (automationCancelled) {
-      return;
-    }
     confirmIntervalId = window.setInterval(() => {
-      if (!confirmMergeEnabled || automationCancelled) {
-        stopConfirmInterval();
+      if (!confirmMergeEnabled) {
+        clearInterval(confirmIntervalId);
+        confirmIntervalId = null;
         return;
       }
       confirmAttempts += 1;
@@ -246,12 +197,14 @@
       if (btn) {
         const clicked = clickButton(btn, 'Confirm merge button');
         if (clicked) {
-          stopConfirmInterval();
+          clearInterval(confirmIntervalId);
+          confirmIntervalId = null;
           maybeCloseTab();
         }
       }
       if (confirmAttempts >= MAX_ATTEMPTS) {
-        stopConfirmInterval();
+        clearInterval(confirmIntervalId);
+        confirmIntervalId = null;
       }
     }, 1000);
   }
@@ -262,8 +215,8 @@
       mergePrEnabled = DEFAULT_MERGE_PR_AUTO_CLICK;
       confirmMergeEnabled = DEFAULT_CONFIRM_MERGE_AUTO_CLICK;
       closeAfterEnabled = DEFAULT_CLOSE_AFTER;
-      if (mergePrEnabled && !automationCancelled) startMergeAutoClick();
-      if (confirmMergeEnabled && !automationCancelled) startConfirmAutoClick();
+      if (mergePrEnabled) startMergeAutoClick();
+      if (confirmMergeEnabled) startConfirmAutoClick();
       return;
     }
     try {
@@ -285,16 +238,16 @@
         mergePrEnabled = typeof m === "boolean" ? m : DEFAULT_MERGE_PR_AUTO_CLICK;
         confirmMergeEnabled = typeof c === "boolean" ? c : DEFAULT_CONFIRM_MERGE_AUTO_CLICK;
         closeAfterEnabled = typeof x === "boolean" ? x : DEFAULT_CLOSE_AFTER;
-        if (mergePrEnabled && !automationCancelled) startMergeAutoClick();
-        if (confirmMergeEnabled && !automationCancelled) startConfirmAutoClick();
+        if (mergePrEnabled) startMergeAutoClick();
+        if (confirmMergeEnabled) startConfirmAutoClick();
       });
     } catch (error) {
       console.error("codex-autorun: unable to read merge preferences", error);
       mergePrEnabled = DEFAULT_MERGE_PR_AUTO_CLICK;
       confirmMergeEnabled = DEFAULT_CONFIRM_MERGE_AUTO_CLICK;
       closeAfterEnabled = DEFAULT_CLOSE_AFTER;
-      if (mergePrEnabled && !automationCancelled) startMergeAutoClick();
-      if (confirmMergeEnabled && !automationCancelled) startConfirmAutoClick();
+      if (mergePrEnabled) startMergeAutoClick();
+      if (confirmMergeEnabled) startConfirmAutoClick();
     }
   }
 
