@@ -84,8 +84,46 @@
     return findButtonWithText("confirm merge");
   }
 
+  function isElementDisabled(el) {
+    if (!el) {
+      return true;
+    }
+    if (typeof el.disabled === "boolean" && el.disabled) {
+      return true;
+    }
+    if (el.hasAttribute && el.hasAttribute("disabled")) {
+      return true;
+    }
+    const ariaDisabled =
+      typeof el.getAttribute === "function"
+        ? (el.getAttribute("aria-disabled") || "").toLowerCase()
+        : "";
+    if (ariaDisabled && ariaDisabled !== "false") {
+      return true;
+    }
+    const dataDisabled =
+      typeof el.getAttribute === "function"
+        ? (el.getAttribute("data-disabled") || "").toLowerCase()
+        : "";
+    if (dataDisabled && dataDisabled !== "false") {
+      return true;
+    }
+    if (typeof el.closest === "function") {
+      const disabledAncestor = el.closest(
+        '[aria-disabled="true"], [data-disabled="true"], .disabled',
+      );
+      if (disabledAncestor) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function clickButton(el, description) {
     if (!el || typeof el.click !== "function") {
+      return false;
+    }
+    if (isElementDisabled(el)) {
       return false;
     }
     try {
