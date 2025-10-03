@@ -94,7 +94,7 @@ const SOUND_FILE_VALUES = new Set(SOUND_FILE_OPTIONS);
 // associated click behaviour (opening tasks or creating pull requests)
 // for that status. Users can toggle each status via the settings UI.
 const AUTO_CLICK_STATUS_STORAGE_KEY = "codexAutoClickStatuses";
-const DEFAULT_AUTO_CLICK_STATUSES = ["ready", "pr-created"];
+const DEFAULT_AUTO_CLICK_STATUSES = ["ready", "pr-created", "pr-ready"];
 
 // Storage key and default for the PR ready auto-click delay. This controls
 // how long (in milliseconds) to wait after the "View PR" button appears
@@ -115,7 +115,7 @@ let cachedPrReadyAutoClickDelayMs = DEFAULT_PR_READY_AUTO_CLICK_DELAY_MS;
 // applicable to the pr-ready status. Exposed via a checkbox in the
 // settings.
 const PR_READY_CLOSE_TAB_KEY = "codexPrReadyCloseTab";
-const DEFAULT_PR_READY_CLOSE_TAB = false;
+const DEFAULT_PR_READY_CLOSE_TAB = true;
 
 // Cached copy of the close-tab preference. Updated on load and when the
 // user changes the setting. Used by the UI to reflect the current
@@ -126,13 +126,13 @@ let cachedPrReadyCloseTab = DEFAULT_PR_READY_CLOSE_TAB;
 // control whether the extension should automatically click the "Merge pull
 // request" and "Confirm merge" buttons on GitHub PR pages, and whether
 // to close the GitHub tab after confirming the merge. Each preference
-// defaults to false (disabled).
+// defaults to true (enabled) so the automation runs out of the box.
 const MERGE_PR_AUTO_CLICK_KEY = "codexMergePrAutoClickEnabled";
-const DEFAULT_MERGE_PR_AUTO_CLICK = false;
+const DEFAULT_MERGE_PR_AUTO_CLICK = true;
 const CONFIRM_MERGE_AUTO_CLICK_KEY = "codexConfirmMergeAutoClickEnabled";
-const DEFAULT_CONFIRM_MERGE_AUTO_CLICK = false;
+const DEFAULT_CONFIRM_MERGE_AUTO_CLICK = true;
 const CLOSE_GITHUB_AFTER_MERGE_KEY = "codexCloseGithubAfterMergeEnabled";
-const DEFAULT_CLOSE_GITHUB_AFTER_MERGE = false;
+const DEFAULT_CLOSE_GITHUB_AFTER_MERGE = true;
 
 // Cached copies of the GitHub merge automation preferences. These values
 // are updated when loading from storage and when the user toggles the
