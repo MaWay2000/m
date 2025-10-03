@@ -36,15 +36,15 @@ const NOTIFICATION_DEFAULT_SOUND_MUTED_STORAGE_KEY =
 // cause the extension to automatically open the task and (if enabled) create
 // a pull request when a task becomes ready. Enabling "pr-created" will
 // perform any follow-up actions after a PR is created (such as scheduling
-// the pr-ready notification). "pr-ready" currently has no auto-click
-// behaviour implemented but is exposed for future use. "merged" has no
-// auto-click behaviour and is ignored.
+// the pr-ready notification). Enabling "pr-ready" will auto-click the
+// "View PR" button when a pull request becomes ready to view. "merged" has
+// no auto-click behaviour and is ignored.
 const AUTO_CLICK_STATUS_STORAGE_KEY = "codexAutoClickStatuses";
 
-// By default automatically handle tasks becoming ready and PRs being
-// created. Users can disable auto-click on a per-status basis in the
-// settings.
-const DEFAULT_AUTO_CLICK_STATUSES = ["ready", "pr-created"];
+// By default automatically handle tasks becoming ready, PRs being created and
+// PRs becoming ready to view. Users can disable auto-click on a per-status
+// basis in the settings.
+const DEFAULT_AUTO_CLICK_STATUSES = ["ready", "pr-created", "pr-ready"];
 
 // In-memory set of statuses for which auto-click behaviour is enabled.
 let autoClickEnabledStatuses = new Set(DEFAULT_AUTO_CLICK_STATUSES);

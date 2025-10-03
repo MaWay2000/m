@@ -1098,7 +1098,7 @@ function setupCreatePrAutoClick() {
     (typeof browser !== "undefined" && browser?.storage) ||
     (typeof chrome !== "undefined" && chrome?.storage);
   const AUTO_CLICK_STATUS_STORAGE_KEY = "codexAutoClickStatuses";
-  const DEFAULT_AUTO_CLICK_STATUSES = ["ready", "pr-created"];
+  const DEFAULT_AUTO_CLICK_STATUSES = ["ready", "pr-created", "pr-ready"];
   const applyAutoClick = (enabled) => {
     if (!enabled) {
       return; // Do nothing if auto-click is disabled for pr-created
@@ -1223,7 +1223,7 @@ function setupViewPrAutoClick() {
     (typeof browser !== "undefined" && browser?.storage) ||
     (typeof chrome !== "undefined" && chrome?.storage);
   const AUTO_CLICK_STATUS_STORAGE_KEY = "codexAutoClickStatuses";
-  const DEFAULT_AUTO_CLICK_STATUSES = ["ready", "pr-created"];
+  const DEFAULT_AUTO_CLICK_STATUSES = ["ready", "pr-created", "pr-ready"];
 
   // Storage key and default for the delay before auto-clicking the
   // "View PR" button. This mirrors the key defined in the options
