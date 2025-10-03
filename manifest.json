@@ -8,7 +8,8 @@
     "tabs",
     "notifications",
     "https://chatgpt.com/*",
-    "https://debuggpt.tools/*"
+    "https://debuggpt.tools/*",
+    "https://github.com/*"
   ],
   "icons": {
     "16": "src/icons/icon-16.png",
@@ -40,7 +41,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*", "https://debuggpt.tools/*"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://debuggpt.tools/*",
+        "https://github.com/*"
+      ],
       "js": ["src/codexWatcher.js"],
       "run_at": "document_idle"
     }

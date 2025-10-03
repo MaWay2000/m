@@ -2,6 +2,12 @@ const runtime =
   typeof browser !== "undefined" && browser?.runtime
     ? browser.runtime
     : chrome?.runtime;
+const storageApi =
+  typeof browser !== "undefined" && browser?.storage
+    ? browser.storage
+    : typeof chrome !== "undefined" && chrome?.storage
+      ? chrome.storage
+      : null;
 
 const trackedTasks = new Map();
 const knownTaskNames = new Map();
@@ -20,6 +26,97 @@ const VIEW_PR_TEXT_PATTERNS = [
   "pull request ready",
 ];
 const WORKING_TASK_MISSING_GRACE_MS = 15 * 60 * 1000;
+const AUTO_MERGE_STORAGE_KEY = "codexMergeAutoclickEnabled";
+const MERGE_BUTTON_SELECTORS = [
+  "form.js-merge-pr button.js-merge-button",
+  "form.js-merge-pr button[data-details-container]",
+  "form.js-merge-pr button[data-test-selector='merge-box-button']",
+  "button[data-test-selector='merge-box-button']",
+  "button[data-details-container='.js-merge-pr']",
+];
+const MERGE_CONFIRM_BUTTON_SELECTORS = [
+  "form.js-merge-pr button.js-merge-commit-button",
+  "form.js-merge-pr button[data-test-selector='merge-box-merge-button']",
+  "form.js-merge-pr button.btn-primary[type='submit']",
+  "button[data-test-selector='merge-box-merge-button']",
+  "button.js-merge-commit-button",
+];
+
+let autoMergeEnabled = false;
+let triggerMergeAutoclickAttempt = () => {};
+let resetMergeAutoclickState = () => {};
+
+function storageGet(key) {
+  if (!storageApi?.local) {
+    return Promise.resolve(undefined);
+  }
+  try {
+    const result = storageApi.local.get(key);
+    if (result && typeof result.then === "function") {
+      return result.then((data) => data?.[key]);
+    }
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      storageApi.local.get(key, (data) => {
+        const runtimeError =
+          typeof chrome !== "undefined" && chrome?.runtime?.lastError
+            ? chrome.runtime.lastError
+            : null;
+        if (runtimeError) {
+          reject(new Error(runtimeError.message));
+          return;
+        }
+        resolve(data?.[key]);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function updateAutoMergeEnabled(value) {
+  const enabled = value === true;
+  if (autoMergeEnabled === enabled) {
+    return;
+  }
+  autoMergeEnabled = enabled;
+  if (enabled) {
+    resetMergeAutoclickState();
+    triggerMergeAutoclickAttempt();
+  }
+}
+
+async function loadAutoMergePreference() {
+  try {
+    const stored = await storageGet(AUTO_MERGE_STORAGE_KEY);
+    updateAutoMergeEnabled(stored === true);
+  } catch (error) {
+    console.error("codex-autorun: failed to load auto-merge preference", error);
+  }
+}
+
+const storageChangeEmitter =
+  typeof browser !== "undefined" && browser?.storage?.onChanged
+    ? browser.storage.onChanged
+    : typeof chrome !== "undefined" && chrome?.storage?.onChanged
+      ? chrome.storage.onChanged
+      : null;
+
+if (storageChangeEmitter) {
+  storageChangeEmitter.addListener((changes, areaName) => {
+    if (areaName !== "local" || !changes) {
+      return;
+    }
+    const change = changes[AUTO_MERGE_STORAGE_KEY];
+    if (!change) {
+      return;
+    }
+    updateAutoMergeEnabled(change.newValue === true);
+  });
+}
 
 function isTransparentColor(color) {
   if (!color || color === "transparent") {
@@ -1048,6 +1145,76 @@ function isElementDisabled(element) {
   return false;
 }
 
+function isOnGitHubPullRequestPage() {
+  try {
+    const { hostname, pathname } = window.location ?? {};
+    if (typeof hostname !== "string" || typeof pathname !== "string") {
+      return false;
+    }
+    if (!hostname.toLowerCase().endsWith("github.com")) {
+      return false;
+    }
+    return pathname.toLowerCase().includes("/pull/");
+  } catch (error) {
+    return false;
+  }
+}
+
+function findMergeButton() {
+  for (const selector of MERGE_BUTTON_SELECTORS) {
+    const candidate = document.querySelector(selector);
+    if (candidate && isElementVisible(candidate)) {
+      return candidate;
+    }
+  }
+
+  const candidates = document.querySelectorAll("button, [role='button']");
+  for (const candidate of candidates) {
+    if (!isElementVisible(candidate)) {
+      continue;
+    }
+    if (candidate.classList?.contains("js-merge-button")) {
+      return candidate;
+    }
+    if (elementTextMatches(candidate, "merge pull request")) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function findMergeConfirmButton() {
+  for (const selector of MERGE_CONFIRM_BUTTON_SELECTORS) {
+    const candidate = document.querySelector(selector);
+    if (!candidate || !isElementVisible(candidate)) {
+      continue;
+    }
+    if (candidate.classList?.contains("js-merge-button")) {
+      continue;
+    }
+    return candidate;
+  }
+
+  const candidates = document.querySelectorAll("form.js-merge-pr button, form.js-merge-pr [role='button']");
+  for (const candidate of candidates) {
+    if (!isElementVisible(candidate)) {
+      continue;
+    }
+    if (candidate.classList?.contains("js-merge-button")) {
+      continue;
+    }
+    if (elementTextMatches(candidate, "confirm merge")) {
+      return candidate;
+    }
+    if (elementTextMatches(candidate, "merge pull request")) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 function isElementVisible(element) {
   if (!element) {
     return false;
@@ -1327,6 +1494,117 @@ function setupCreatePrAutoClick() {
   attemptClick();
 }
 
+function setupMergePrAutoClick() {
+  if (window.__codexMergePrAutoclickInitialized) {
+    return;
+  }
+  window.__codexMergePrAutoclickInitialized = true;
+
+  const state = {
+    mergeClicked: false,
+    confirmClicked: false,
+    completed: false,
+    observer: null,
+    intervalId: null,
+  };
+
+  const cleanup = () => {
+    if (state.observer) {
+      state.observer.disconnect();
+      state.observer = null;
+    }
+    if (state.intervalId !== null) {
+      clearInterval(state.intervalId);
+      state.intervalId = null;
+    }
+  };
+
+  const attemptClick = () => {
+    if (!autoMergeEnabled || state.completed || !isOnGitHubPullRequestPage()) {
+      return;
+    }
+
+    const confirmButton = findMergeConfirmButton();
+    if (confirmButton && !isElementDisabled(confirmButton)) {
+      try {
+        confirmButton.click();
+        console.log("codex-autorun: auto-clicked Confirm merge button.");
+        state.confirmClicked = true;
+        state.mergeClicked = true;
+        state.completed = true;
+        cleanup();
+      } catch (error) {
+        console.warn("codex-autorun: failed to auto-click Confirm merge", error);
+      }
+      return;
+    }
+
+    if (state.mergeClicked) {
+      return;
+    }
+
+    const mergeButton = findMergeButton();
+    if (!mergeButton || !isElementVisible(mergeButton)) {
+      return;
+    }
+    if (isElementDisabled(mergeButton)) {
+      return;
+    }
+
+    try {
+      mergeButton.click();
+      console.log("codex-autorun: auto-clicked Merge pull request button.");
+      state.mergeClicked = true;
+    } catch (error) {
+      console.warn("codex-autorun: failed to auto-click Merge pull request", error);
+    }
+  };
+
+  triggerMergeAutoclickAttempt = () => {
+    if (!state.completed) {
+      attemptClick();
+    }
+  };
+
+  resetMergeAutoclickState = () => {
+    if (state.completed) {
+      return;
+    }
+    state.mergeClicked = false;
+    state.confirmClicked = false;
+  };
+
+  const observer = new MutationObserver(() => {
+    if (!state.completed) {
+      attemptClick();
+    }
+  });
+  state.observer = observer;
+  if (document.documentElement) {
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+        if (!state.completed) {
+          attemptClick();
+        }
+      },
+      { once: true },
+    );
+  } else {
+    attemptClick();
+  }
+
+  state.intervalId = window.setInterval(() => {
+    if (!state.completed) {
+      attemptClick();
+    }
+  }, AUTO_CLICK_INTERVAL_MS);
+}
+
 if (!window.__codexSquareWatcherInitialized) {
   window.__codexSquareWatcherInitialized = true;
   scanForTasks();
@@ -1334,6 +1612,8 @@ if (!window.__codexSquareWatcherInitialized) {
 }
 
 setupCreatePrAutoClick();
+setupMergePrAutoClick();
+loadAutoMergePreference();
 
 function checkTaskStatus(taskId, hintedUrl) {
   if (!taskId) {

@@ -122,11 +122,13 @@ main {
   color: #64748b;
 }
 
-#notification-status-message {
+#notification-status-message,
+#automation-status-message {
   min-height: 1.25rem;
 }
 
-#notification-status-message.error {
+#notification-status-message.error,
+#automation-status-message.error {
   color: #b91c1c;
 }
 

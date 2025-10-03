@@ -145,6 +145,31 @@
         </div>
       </section>
 
+      <section class="card" aria-labelledby="automation-preferences-title">
+        <div class="card-header">
+          <h2 id="automation-preferences-title">Automation</h2>
+        </div>
+        <p class="hint">
+          Automatically click workflow buttons after Codex finishes a task.
+        </p>
+        <form id="automation-preferences">
+          <label class="checkbox-option">
+            <input
+              type="checkbox"
+              id="auto-merge-enabled"
+              name="auto-merge-enabled"
+            />
+            Auto-click &ldquo;Merge pull request&rdquo; button
+          </label>
+        </form>
+        <p
+          class="hint"
+          id="automation-status-message"
+          role="status"
+          aria-live="polite"
+        ></p>
+      </section>
+
       <!-- Popup appearance configuration -->
       <section class="card" aria-labelledby="popup-appearance-title">
         <div class="card-header">

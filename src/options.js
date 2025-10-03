@@ -94,6 +94,8 @@ const DEFAULT_NOTIFICATION_POPUP_COLORS = {
   page: "#1f2937",
   text: "#22c55e",
 };
+const AUTO_MERGE_ENABLED_STORAGE_KEY = "codexMergeAutoclickEnabled";
+const DEFAULT_AUTO_MERGE_ENABLED = false;
 
 // Cached popup appearance values. These are populated from storage on
 // page load and updated when the user changes the settings. Keeping local
@@ -101,6 +103,7 @@ const DEFAULT_NOTIFICATION_POPUP_COLORS = {
 let cachedPopupPosition = { ...DEFAULT_NOTIFICATION_POPUP_POSITION };
 let cachedPopupSize = { ...DEFAULT_NOTIFICATION_POPUP_SIZE };
 let cachedPopupColors = { ...DEFAULT_NOTIFICATION_POPUP_COLORS };
+let cachedAutoMergeEnabled = DEFAULT_AUTO_MERGE_ENABLED;
 
 /**
  * Sanitize a stored popup position. Accepts objects with numeric
@@ -192,6 +195,74 @@ function sanitizePopupColorOption(value) {
     result.text = value.text;
   }
   return Object.keys(result).length > 0 ? result : null;
+}
+
+function applyAutomationPreferences(enabled) {
+  const checkbox = document.getElementById("auto-merge-enabled");
+  const normalized = Boolean(enabled);
+  cachedAutoMergeEnabled = normalized;
+  if (checkbox) {
+    checkbox.checked = normalized;
+  }
+}
+
+function showAutomationStatusMessage(message, isError = false) {
+  const output = document.getElementById("automation-status-message");
+  if (!output) {
+    return;
+  }
+  output.textContent = message ?? "";
+  if (isError) {
+    output.classList.add("error");
+  } else {
+    output.classList.remove("error");
+  }
+}
+
+async function loadAutomationPreferences() {
+  try {
+    const stored = await storageGet(AUTO_MERGE_ENABLED_STORAGE_KEY);
+    const enabled = typeof stored === "boolean" ? stored : DEFAULT_AUTO_MERGE_ENABLED;
+    applyAutomationPreferences(enabled);
+    showAutomationStatusMessage("");
+  } catch (error) {
+    console.error("Unable to load automation preferences", error);
+    applyAutomationPreferences(DEFAULT_AUTO_MERGE_ENABLED);
+    showAutomationStatusMessage(
+      `Unable to load automation preferences: ${error.message}`,
+      true,
+    );
+  }
+}
+
+async function handleAutomationPreferenceChange(event) {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || target.name !== "auto-merge-enabled") {
+    return;
+  }
+
+  const previousValue = cachedAutoMergeEnabled;
+  const nextValue = Boolean(target.checked);
+
+  try {
+    await storageSet(AUTO_MERGE_ENABLED_STORAGE_KEY, nextValue);
+    applyAutomationPreferences(nextValue);
+    showAutomationStatusMessage(
+      nextValue
+        ? "Merge button auto-click enabled."
+        : "Merge button auto-click disabled.",
+    );
+  } catch (error) {
+    console.error("Unable to save automation preference", error);
+    applyAutomationPreferences(previousValue);
+    if (target.checked !== previousValue) {
+      target.checked = previousValue;
+    }
+    showAutomationStatusMessage(
+      `Unable to save automation preferences: ${error.message}`,
+      true,
+    );
+  }
 }
 
 /**
@@ -1149,6 +1220,10 @@ window.addEventListener("DOMContentLoaded", () => {
   loadNotificationPreferences();
   const notificationForm = document.getElementById("notification-preferences");
   notificationForm?.addEventListener("change", handleNotificationPreferencesChange);
+
+  loadAutomationPreferences();
+  const automationForm = document.getElementById("automation-preferences");
+  automationForm?.addEventListener("change", handleAutomationPreferenceChange);
 
   // Hook up the test notification button if it exists. This allows
   // users to trigger a sample notification based on their current
