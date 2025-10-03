@@ -1,5 +1,16 @@
 # Changelog
 
+# 1.1.39 - 2025-10-02
+
+* **Manual override for GitHub merge automation:** The GitHub content script
+  now listens for user interactions—mouse clicks, scrolling and key
+  presses—before automatically merging a pull request. If any interaction is
+  detected, the script cancels further auto-clicking (including the optional
+  post-merge tab close) for the current page load so you can finish the merge
+  manually.
+
+* **Version bumped to 1.1.39.**
+
 # 1.1.38 - 2025-10-02
 
 * **Simplified status table:** Removed the “Merged” row from the
