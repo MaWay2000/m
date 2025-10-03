@@ -1,0 +1,334 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+main {
+  /* Increase the maximum width of the settings page to accommodate
+     additional controls without wrapping. */
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.page-header p {
+  margin: 0.25rem 0 0;
+  color: #475569;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.fieldset-title {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.checkbox-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.sound-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sound-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.sound-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.sound-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.sound-toggle input[type="checkbox"],
+.checkbox-option input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #2563eb;
+}
+
+.sound-select select {
+  min-width: 8rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  color: inherit;
+}
+
+.sound-toggle input[type="checkbox"]:disabled,
+.sound-select select:disabled {
+  opacity: 0.5;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+#notification-status-message {
+  min-height: 1.25rem;
+}
+
+#notification-status-message.error {
+  color: #b91c1c;
+}
+
+/*
+  Styles for the test notification control. The container aligns the button
+  with the rest of the card content, and the button uses a blue primary
+  colour to stand out. Disabled buttons appear faded and are not
+  interactive.
+*/
+.test-notification {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 0.5rem;
+}
+
+.test-notification button {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: #2563eb;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.test-notification button:hover {
+  background-color: #1e40af;
+}
+
+.test-notification button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/*
+ * Notification preferences table layout
+ *
+ * This table displays per‑status settings for auto‑click behaviour,
+ * popup visibility and sound playback. It uses a CSS grid with four
+ * columns: status label, auto‑click toggle, popup toggle, and sound
+ * controls (checkbox + select). The header row defines the column
+ * labels and subsequent rows define the controls for each status.
+ */
+.notification-table {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 2fr;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+.notification-table .notification-header {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #1f2937;
+  display: contents;
+}
+
+.notification-table .notification-header > div {
+  padding-bottom: 0.25rem;
+}
+
+.notification-table .notification-row {
+  display: contents;
+}
+
+/* Additional row under the PR ready row for the close tab option.
+ * This row spans the first three columns for the descriptive text and
+ * uses the fourth column for the checkbox. It appears visually
+ * connected to the PR ready row but on its own line. */
+.notification-table .pr-ready-close-row .close-tab-label {
+  font-size: 0.9rem;
+  color: #475569;
+  padding-left: 0.25rem;
+}
+.notification-table .pr-ready-close-row .close-tab-input {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.notification-table .status-label {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.notification-table .autoclick-cell,
+.notification-table .popup-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.notification-table .sound-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Ensure checkboxes within the table align with the rest of the UI */
+.notification-table input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #2563eb;
+}
+
+/* Popup appearance controls */
+.popup-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+
+.popup-colour-settings {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.popup-colour-heading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-right: 0.25rem;
+}
+
+.popup-colour-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.popup-colour-settings input[type="color"] {
+  width: 2.5rem;
+  height: 2rem;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.popup-controls button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #ffffff;
+  background-color: #2563eb;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.popup-controls button:hover {
+  background-color: #1e40af;
+}
+
+.popup-controls button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* GitHub merge automation section styles */
+/* GitHub merge automation settings layout */
+.gh-merge-settings {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+.gh-merge-row {
+  display: contents;
+}
+
+.gh-merge-label {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.gh-merge-input {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Styling for the close GitHub option within the merge settings */
+.gh-close-row .gh-close-label {
+  font-size: 0.9rem;
+  color: #475569;
+  padding-left: 0.25rem;
+}
+.gh-close-row .gh-close-input {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

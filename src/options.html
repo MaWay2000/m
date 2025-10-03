@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>codex-autorun settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <h1>codex-autorun settings</h1>
+        <p>Adjust extension preferences.</p>
+      </header>
+      <section class="card" aria-labelledby="browser-notifications-title">
+        <div class="card-header">
+          <h2 id="browser-notifications-title">Browser notifications</h2>
+        </div>
+        <p class="hint">
+          Choose which task status changes should trigger a browser notification.
+        </p>
+        <form id="notification-preferences">
+          <fieldset>
+            <legend class="fieldset-title">
+              Show a notification when a task becomes:
+            </legend>
+            <!-- Notification settings table -->
+            <div class="notification-table">
+              <!-- Header row -->
+              <div class="notification-header row">
+                <div class="notification-header-status">Status</div>
+                <div class="notification-header-autoclick">Autoclick</div>
+                <div class="notification-header-popup">Show popup</div>
+                <div class="notification-header-sound">Play sound</div>
+              </div>
+              <!-- Task ready row -->
+              <div class="notification-row" data-status="ready">
+                <div class="status-label">Task ready to view</div>
+                <div class="autoclick-cell">
+                  <input type="checkbox" name="autoclick-status" value="ready" />
+                </div>
+                <div class="popup-cell">
+                  <input type="checkbox" name="notification-status" value="ready" />
+                </div>
+                <div class="sound-cell">
+                  <label class="sound-toggle">
+                    <input
+                      type="checkbox"
+                      name="notification-sound-enabled"
+                      data-status="ready"
+                      checked
+                    />
+                  </label>
+                  <label class="sound-select">
+                    <select
+                      name="notification-sound-selection"
+                      data-status="ready"
+                      aria-label="Sound"
+                    >
+                      <option value="1.mp3">Sound 1</option>
+                      <option value="2.mp3">Sound 2</option>
+                      <option value="3.mp3">Sound 3</option>
+                      <option value="4.mp3">Sound 4</option>
+                      <option value="5.mp3">Sound 5</option>
+                      <option value="6.mp3">Sound 6</option>
+                      <option value="7.mp3">Sound 7</option>
+                      <option value="8.mp3">Sound 8</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <!-- PR ready to create row (formerly "PR created") -->
+              <div class="notification-row" data-status="pr-created">
+                <div class="status-label">PR ready to create</div>
+                <div class="autoclick-cell">
+                  <input type="checkbox" name="autoclick-status" value="pr-created" />
+                </div>
+                <div class="popup-cell">
+                  <input type="checkbox" name="notification-status" value="pr-created" />
+                </div>
+                <div class="sound-cell">
+                  <label class="sound-toggle">
+                    <input
+                      type="checkbox"
+                      name="notification-sound-enabled"
+                      data-status="pr-created"
+                      checked
+                    />
+                  </label>
+                  <label class="sound-select">
+                    <select
+                      name="notification-sound-selection"
+                      data-status="pr-created"
+                      aria-label="Sound"
+                    >
+                      <option value="1.mp3">Sound 1</option>
+                      <option value="2.mp3">Sound 2</option>
+                      <option value="3.mp3">Sound 3</option>
+                      <option value="4.mp3">Sound 4</option>
+                      <option value="5.mp3">Sound 5</option>
+                      <option value="6.mp3">Sound 6</option>
+                      <option value="7.mp3">Sound 7</option>
+                      <option value="8.mp3">Sound 8</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <!-- PR ready row -->
+              <div class="notification-row" data-status="pr-ready">
+                <div class="status-label">PR ready to view (Open github)</div>
+                <div class="autoclick-cell">
+                  <input type="checkbox" name="autoclick-status" value="pr-ready" />
+                </div>
+                <div class="popup-cell">
+                  <input type="checkbox" name="notification-status" value="pr-ready" />
+                </div>
+                <div class="sound-cell">
+                  <label class="sound-toggle">
+                    <input
+                      type="checkbox"
+                      name="notification-sound-enabled"
+                      data-status="pr-ready"
+                      checked
+                    />
+                  </label>
+                  <label class="sound-select">
+                    <select
+                      name="notification-sound-selection"
+                      data-status="pr-ready"
+                      aria-label="Sound"
+                    >
+                      <option value="1.mp3">Sound 1</option>
+                      <option value="2.mp3">Sound 2</option>
+                      <option value="3.mp3">Sound 3</option>
+                      <option value="4.mp3">Sound 4</option>
+                      <option value="5.mp3">Sound 5</option>
+                      <option value="6.mp3">Sound 6</option>
+                      <option value="7.mp3">Sound 7</option>
+                      <option value="8.mp3">Sound 8</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <!-- PR ready close tab row (appears inside the same visual group as the PR ready row) -->
+              <div class="notification-row pr-ready-close-row" data-status="pr-ready-close">
+                <!-- Span the first three columns for the descriptive label -->
+                <div class="close-tab-label" style="grid-column: span 3; font-size: 0.9rem; color: #475569; padding-left: 0.25rem;">
+                  Close task window when PR ready to view
+                </div>
+                <!-- Checkbox for closing the tab when PR is ready -->
+                <div class="close-tab-input" style="display: flex; justify-content: center; align-items: center;">
+                  <input
+                    type="checkbox"
+                    name="close-task-tab"
+                    data-status="pr-ready"
+                  />
+                </div>
+              </div>
+              <!-- Merged row is intentionally removed; no settings are exposed for this status -->
+            </div>
+            <!-- End of notification status table -->
+
+            <!-- PR ready auto-click delay configuration -->
+            <div class="delay-setting" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+              <label for="pr-ready-delay" style="white-space: nowrap;">
+                PR ready auto-click delay (seconds):
+              </label>
+              <input
+                type="number"
+                id="pr-ready-delay"
+                name="pr-ready-delay"
+                min="0"
+                step="1"
+                value="3"
+                style="width: 5rem;"
+              />
+            </div>
+            <!-- GitHub merge automation settings -->
+            <div class="gh-merge-settings" style="margin-top: 1rem;">
+              <div class="gh-merge-row">
+                <div class="gh-merge-label">Auto-click "Merge pull request" button</div>
+                <div class="gh-merge-input">
+                  <input type="checkbox" id="auto-merge-pr" name="auto-merge-pr" />
+                </div>
+              </div>
+              <div class="gh-merge-row">
+                <div class="gh-merge-label">Auto-click "Confirm merge" button</div>
+                <div class="gh-merge-input">
+                  <input type="checkbox" id="auto-confirm-merge" name="auto-confirm-merge" />
+                </div>
+              </div>
+              <div class="gh-merge-row gh-close-row">
+                <div class="gh-close-label">Close GitHub window when Confirm merge clicked</div>
+                <div class="gh-close-input">
+                  <input type="checkbox" id="close-github-after-merge" name="close-github-after-merge" />
+                </div>
+              </div>
+            </div>
+          </fieldset>
+        </form>
+        <p
+          class="hint"
+          id="notification-status-message"
+          role="status"
+          aria-live="polite"
+        ></p>
+
+        <!-- Test notification button -->
+        <div class="test-notification">
+          <!--
+            A button that triggers a sample notification using the current
+            notification settings. It is disabled while sending the test
+            and re-enabled afterwards. The handler is wired up in
+            options.js.
+          -->
+          <button type="button" id="test-notification-btn">Test notification</button>
+        </div>
+      </section>
+
+      <!-- Popup appearance configuration -->
+      <section class="card" aria-labelledby="popup-appearance-title">
+        <div class="card-header">
+          <h2 id="popup-appearance-title">Notification popup appearance</h2>
+        </div>
+        <p class="hint">
+          Adjust where the popup appears on screen, its size and colours. To set the
+          position and size, click <strong>Edit position and size</strong>, move the
+          preview window, then click it to save your changes.
+        </p>
+        <form id="popup-appearance-form">
+          <div class="popup-controls">
+            <button type="button" id="edit-popup-position-btn">Edit position and size</button>
+            <div class="popup-colour-settings">
+              <span class="popup-colour-heading">Popup colours:</span>
+              <label class="popup-colour-option" for="popup-bg-color">
+                Button
+                <input type="color" id="popup-bg-color" name="popup-bg-color" />
+              </label>
+              <label class="popup-colour-option" for="popup-page-color">
+                Background
+                <input type="color" id="popup-page-color" name="popup-page-color" />
+              </label>
+              <label class="popup-colour-option" for="popup-text-color">
+                Text
+                <input type="color" id="popup-text-color" name="popup-text-color" />
+              </label>
+            </div>
+          </div>
+        </form>
+        <p class="hint" id="popup-appearance-status" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
