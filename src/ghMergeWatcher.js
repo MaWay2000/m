@@ -30,10 +30,12 @@
   const CLOSE_GITHUB_AFTER_MERGE_KEY = "codexCloseGithubAfterMergeEnabled";
 
   // Default values when storage is unavailable or preferences are
-  // missing. All options default to false (no auto-click).
-  const DEFAULT_MERGE_PR_AUTO_CLICK = false;
-  const DEFAULT_CONFIRM_MERGE_AUTO_CLICK = false;
-  const DEFAULT_CLOSE_AFTER = false;
+  // missing. These defaults should mirror the values exposed in the
+  // options UI (see options.js). All GitHub merge automation toggles
+  // default to true so the feature works out of the box.
+  const DEFAULT_MERGE_PR_AUTO_CLICK = true;
+  const DEFAULT_CONFIRM_MERGE_AUTO_CLICK = true;
+  const DEFAULT_CLOSE_AFTER = true;
 
   let mergePrEnabled = DEFAULT_MERGE_PR_AUTO_CLICK;
   let confirmMergeEnabled = DEFAULT_CONFIRM_MERGE_AUTO_CLICK;
