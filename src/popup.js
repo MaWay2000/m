@@ -61,6 +61,38 @@ const DEFAULT_SOUND_SELECTIONS = {
   "pr-ready": "1.mp3",
   merged: "1.mp3",
 };
+const STATUS_DISPLAY = {
+  working: {
+    badge: "Working",
+    description: "Task in progress",
+    className: "task-status--working",
+  },
+  ready: {
+    badge: "Ready",
+    description: "Task ready to view",
+    className: "task-status--ready",
+  },
+  "pr-created": {
+    badge: "PR created",
+    description: "PR ready to create",
+    className: "task-status--pr-created",
+  },
+  "pr-ready": {
+    badge: "PR ready",
+    description: "PR ready to view",
+    className: "task-status--pr-ready",
+  },
+  merged: {
+    badge: "Merged",
+    description: "Pull request merged",
+    className: "task-status--merged",
+  },
+  "other status": {
+    badge: "Other status",
+    description: "Other status",
+    className: "task-status--other",
+  },
+};
 const SOUND_STATUS_VALUES = new Set(SOUND_STATUSES);
 const SOUND_FILE_OPTIONS = [
   "1.mp3",
@@ -80,6 +112,39 @@ let hasRenderedHistory = false;
 let audioContext;
 let userHasInteracted = false;
 const audioBufferCache = new Map();
+const HISTORY_REFRESH_INTERVAL_MS = 60 * 1000;
+let historyRefreshTimerId = null;
+let historyRefreshInFlight = false;
+let historyRefreshQueued = false;
+
+function normalizeStatusKey(value) {
+  if (!value) {
+    return "";
+  }
+  return String(value).trim().toLowerCase();
+}
+
+function titleCase(value) {
+  return value
+    .split(/\s+|-/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function resolveStatusDisplay(statusKey) {
+  const normalized = normalizeStatusKey(statusKey) || "working";
+  const display = STATUS_DISPLAY[normalized];
+  if (display) {
+    return display;
+  }
+  const fallback = titleCase(normalized);
+  return {
+    badge: fallback,
+    description: fallback,
+    className: "",
+  };
+}
 
 function storageGet(key) {
   if (!storageApi?.local) {
@@ -698,7 +763,7 @@ function renderHistory(history) {
     startedTime.textContent = formatTimestamp(task?.startedAt);
 
     const statusValueRaw = task?.status ? String(task.status) : "working";
-    const statusKey = statusValueRaw.trim().toLowerCase();
+    const statusKey = normalizeStatusKey(statusValueRaw) || "working";
 
     if (task?.id) {
       nextStatuses.set(task.id, statusKey);
@@ -721,7 +786,27 @@ function renderHistory(history) {
     }
     content.append(header);
 
-    meta.append(idBadge, startedTime);
+    const statusDisplay = resolveStatusDisplay(statusKey);
+    const statusContainer = document.createElement("span");
+    statusContainer.className = "task-status-container";
+
+    const statusBadge = document.createElement("span");
+    const statusClassNames = ["task-status"];
+    if (statusDisplay.className) {
+      statusClassNames.push(statusDisplay.className);
+    }
+    statusBadge.className = statusClassNames.join(" ");
+    statusBadge.textContent = statusDisplay.badge;
+    statusContainer.append(statusBadge);
+
+    if (statusDisplay.description) {
+      const statusLabel = document.createElement("span");
+      statusLabel.className = "task-status-label";
+      statusLabel.textContent = statusDisplay.description;
+      statusContainer.append(statusLabel);
+    }
+
+    meta.append(idBadge, startedTime, statusContainer);
     content.append(meta);
     item.append(content);
 
@@ -785,6 +870,12 @@ function renderHistory(history) {
 }
 
 async function loadHistory() {
+  if (historyRefreshInFlight) {
+    historyRefreshQueued = true;
+    return;
+  }
+
+  historyRefreshInFlight = true;
   errorOutput.textContent = "";
   try {
     const response = await sendMessage({ type: "get-history" });
@@ -802,7 +893,24 @@ async function loadHistory() {
     countBadge.hidden = true;
     historyList.innerHTML = "";
     errorOutput.textContent = `Unable to load history: ${error.message}`;
+  } finally {
+    historyRefreshInFlight = false;
+    if (historyRefreshQueued) {
+      historyRefreshQueued = false;
+      queueMicrotask(() => {
+        loadHistory();
+      });
+    }
   }
+}
+
+function ensureHistoryAutoRefresh() {
+  if (historyRefreshTimerId !== null) {
+    return;
+  }
+  historyRefreshTimerId = window.setInterval(() => {
+    loadHistory();
+  }, HISTORY_REFRESH_INTERVAL_MS);
 }
 
 function handleOpenSettingsClick(event) {
@@ -838,6 +946,8 @@ window.addEventListener("DOMContentLoaded", () => {
       console.error("Failed to prepare sound preferences", error);
     })
     .finally(() => {
-      loadHistory();
+      loadHistory().finally(() => {
+        ensureHistoryAutoRefresh();
+      });
     });
 });

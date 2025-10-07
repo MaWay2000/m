@@ -213,6 +213,8 @@ const STATUS_LABELS = {
   // settings.
   "pr-ready": "PR ready to view",
   merged: "Merged",
+  "other status": "Other status",
+  working: "Working on task",
 };
 
 function sanitizeStatusList(value) {
@@ -538,7 +540,15 @@ function formatStatusLabel(status) {
     return "";
   }
 
-  return STATUS_LABELS[normalized] ?? normalized;
+  if (Object.prototype.hasOwnProperty.call(STATUS_LABELS, normalized)) {
+    return STATUS_LABELS[normalized];
+  }
+
+  return normalized
+    .split(/\s+|-/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
 }
 
 function createNotification(options) {
