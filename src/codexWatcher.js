@@ -6,6 +6,10 @@ const runtime =
 const trackedTasks = new Map();
 const knownTaskNames = new Map();
 const pendingNameRefreshes = new Map();
+// Track status announcements detected within the task conversation so we only
+// notify the background script once per distinct update. The map stores a set
+// of fingerprints (status + text) keyed by task id.
+const conversationStatusAnnouncements = new Map();
 const MIN_SQUARE_SIZE = 6;
 const MAX_SQUARE_SIZE = 24;
 const AUTO_CLICK_MAX_ATTEMPTS = 120;
@@ -191,6 +195,65 @@ function extractTaskId(href) {
   } catch (error) {
     return null;
   }
+}
+
+function normalizeStatusLabel(label) {
+  if (!label) {
+    return "";
+  }
+  const normalized = label.replace(/[^a-z0-9\s-]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.includes("pr ready to view")) {
+    return "pr-ready";
+  }
+  if (normalized.includes("pr ready to create") || normalized.includes("pr created")) {
+    return "pr-created";
+  }
+  if (normalized.includes("task ready to view") || normalized === "ready") {
+    return "ready";
+  }
+  if (normalized.includes("merged")) {
+    return "merged";
+  }
+  if (normalized.includes("closed")) {
+    return "closed";
+  }
+  if (normalized.includes("open")) {
+    return "open";
+  }
+  return "";
+}
+
+function extractStatusFromAnnouncement(text) {
+  if (!text) {
+    return { status: "", fingerprint: "" };
+  }
+  const trimmed = text.replace(/\s+/g, " ").trim();
+  if (!trimmed) {
+    return { status: "", fingerprint: "" };
+  }
+
+  const statusChangedMatch = trimmed.match(/status changed to\s+([^.!?]+)/i);
+  if (statusChangedMatch) {
+    const status = normalizeStatusLabel(statusChangedMatch[1]);
+    if (status) {
+      return { status, fingerprint: `${status}::${statusChangedMatch[1].trim().toLowerCase()}` };
+    }
+  }
+
+  if (/pull request merged/i.test(trimmed)) {
+    return { status: "merged", fingerprint: "merged::pull request merged" };
+  }
+  if (/pull request closed/i.test(trimmed)) {
+    return { status: "closed", fingerprint: "closed::pull request closed" };
+  }
+
+  return { status: "", fingerprint: "" };
 }
 
 const IGNORED_TEXT_PATTERNS = [
@@ -710,6 +773,106 @@ function updateCurrentTaskNameFromConversation() {
   notifyTaskUpdate(updatePayload);
 }
 
+function scanConversationForStatusAnnouncements() {
+  const currentTaskId = extractTaskId(window.location.href);
+  if (!currentTaskId) {
+    return;
+  }
+
+  const normalizedTaskId = String(currentTaskId).trim();
+  if (!normalizedTaskId) {
+    return;
+  }
+
+  const selectorCandidates = [
+    "[data-testid*='status' i]",
+    "[data-testid*='event' i]",
+    "[data-testid*='activity' i]",
+    "[role='status']",
+    "[aria-live]",
+    ".toast",
+    ".Toast",
+  ];
+
+  const elements = [];
+  const seenElements = new Set();
+  for (const selector of selectorCandidates) {
+    try {
+      const found = document.querySelectorAll(selector);
+      for (const el of found) {
+        if (!el || typeof el.textContent !== "string" || seenElements.has(el)) {
+          continue;
+        }
+        seenElements.add(el);
+        elements.push(el);
+      }
+    } catch (error) {
+      // Ignore selector errors and continue with the remaining selectors.
+    }
+  }
+
+  if (!elements.length) {
+    return;
+  }
+
+  elements.sort((a, b) => {
+    if (a === b) {
+      return 0;
+    }
+    const position = a.compareDocumentPosition(b);
+    if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+      return 1;
+    }
+    if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
+      return -1;
+    }
+    return 0;
+  });
+
+  const tracked = trackedTasks.get(normalizedTaskId);
+  let statusSet = conversationStatusAnnouncements.get(normalizedTaskId);
+  if (!statusSet) {
+    statusSet = new Set();
+    conversationStatusAnnouncements.set(normalizedTaskId, statusSet);
+  }
+
+  for (const element of elements) {
+    const { status, fingerprint } = extractStatusFromAnnouncement(
+      element.textContent,
+    );
+    if (!status || !fingerprint || statusSet.has(fingerprint)) {
+      continue;
+    }
+
+    statusSet.add(fingerprint);
+
+    const payload = {
+      id: normalizedTaskId,
+      status,
+      completedAt: new Date().toISOString(),
+    };
+    const knownName = knownTaskNames.get(normalizedTaskId);
+    if (knownName) {
+      payload.name = knownName;
+    }
+    if (tracked?.url) {
+      payload.url = tracked.url;
+    } else {
+      try {
+        const currentUrl = new URL(window.location.href, window.location.origin);
+        payload.url = currentUrl.toString();
+      } catch (error) {
+        // Ignore invalid URLs; leave payload.url unset.
+      }
+    }
+    if (tracked?.startedAt) {
+      payload.startedAt = tracked.startedAt;
+    }
+
+    notifyTaskUpdate(payload);
+  }
+}
+
 function scanForTasks() {
   const now = Date.now();
   const links = Array.from(document.querySelectorAll('a[href*="/codex/tasks/"]'));
@@ -953,6 +1116,7 @@ function scanForTasks() {
   }
 
   updateCurrentTaskNameFromConversation();
+  scanConversationForStatusAnnouncements();
 }
 
 function elementTextMatches(element, text) {
