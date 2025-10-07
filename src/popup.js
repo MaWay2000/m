@@ -27,7 +27,14 @@ const lastKnownTaskStatuses = new Map();
 // active task list and stops related actions from being available. To
 // keep the popup in sync with the background logic we include "pr-ready"
 // alongside the existing completion statuses.
-const COMPLETED_STATUS_KEYS = new Set(["ready", "pr-created", "pr-ready", "merged"]);
+const COMPLETED_STATUS_KEYS = new Set([
+  "ready",
+  "pr-created",
+  "pr-ready",
+  "open",
+  "merged",
+  "closed",
+]);
 
 // When a task transitions through various lifecycle states the extension
 // can play notification sounds. The original implementation only
@@ -38,7 +45,14 @@ const COMPLETED_STATUS_KEYS = new Set(["ready", "pr-created", "pr-ready", "merge
 // include "pr-ready", update the defaults accordingly and include it in
 // the validation set. Users can now customise the sound (or mute it) for
 // this status via the options page.
-const SOUND_STATUSES = ["ready", "pr-created", "pr-ready", "merged"];
+const SOUND_STATUSES = [
+  "ready",
+  "pr-created",
+  "pr-ready",
+  "open",
+  "merged",
+  "closed",
+];
 const SOUND_STATUS_STORAGE_KEY = "codexSoundStatuses";
 const SOUND_SELECTION_STORAGE_KEY = "codexSoundSelections";
 // By default play sounds for all available statuses. Previously only
@@ -50,16 +64,20 @@ const DEFAULT_SOUND_STATUSES = [
   "ready",
   "pr-created",
   "pr-ready",
+  "open",
   "merged",
+  "closed",
 ];
 const DEFAULT_SOUND_SELECTIONS = {
   ready: "1.mp3",
-  "pr-created": "1.mp3",
+  "pr-created": "2.mp3",
   // Default audio file for the PR ready status. Using the same file
   // avoids unexpected changes for users upgrading from earlier versions
   // where no sound was played for this status.
-  "pr-ready": "1.mp3",
+  "pr-ready": "3.mp3",
+  open: "2.mp3",
   merged: "1.mp3",
+  closed: "4.mp3",
 };
 const STATUS_DISPLAY = {
   working: {
@@ -82,10 +100,20 @@ const STATUS_DISPLAY = {
     description: "PR ready to view",
     className: "task-status--pr-ready",
   },
+  open: {
+    badge: "Open",
+    description: "PR open",
+    className: "task-status--open",
+  },
   merged: {
     badge: "Merged",
     description: "Pull request merged",
     className: "task-status--merged",
+  },
+  closed: {
+    badge: "Closed",
+    description: "PR closed",
+    className: "task-status--closed",
   },
   "other status": {
     badge: "Other status",

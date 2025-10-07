@@ -251,9 +251,19 @@ button:disabled {
   color: #5b21b6;
 }
 
+.task-status--open {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .task-status--merged {
   background: #bbf7d0;
   color: #166534;
+}
+
+.task-status--closed {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .task-status--working {

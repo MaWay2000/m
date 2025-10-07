@@ -51,7 +51,14 @@ if (runtimeApi?.onMessage && typeof runtimeApi.onMessage.addListener === "functi
 // Include the new "pr-ready" status representing a pull request that is
 // ready to view. This array controls the order of statuses displayed in
 // the settings and is used to derive default sound enablement.
-const STATUS_OPTIONS = ["ready", "pr-created", "pr-ready", "merged"];
+const STATUS_OPTIONS = [
+  "ready",
+  "pr-created",
+  "pr-ready",
+  "open",
+  "merged",
+  "closed",
+];
 const STATUS_VALUES = new Set(STATUS_OPTIONS);
 const NOTIFICATION_STATUS_STORAGE_KEY = "codexNotificationStatuses";
 const NOTIFICATION_SOUND_SELECTION_STORAGE_KEY =
@@ -65,12 +72,15 @@ const DEFAULT_NOTIFICATION_STATUSES = ["ready", "pr-created", "pr-ready"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   // Use distinct default sounds for each status to provide clear
   // differentiation. The first status plays Sound 1 by default, PR
-  // creation plays Sound 2, PR ready plays Sound 3 and merged reuses
-  // Sound 1. Users can change these selections in the UI.
+  // creation plays Sound 2, PR ready plays Sound 3, the open state reuses
+  // Sound 2, merged reuses Sound 1 and closed uses Sound 4. Users can
+  // change these selections in the UI.
   ready: "1.mp3",
   "pr-created": "2.mp3",
   "pr-ready": "3.mp3",
+  open: "2.mp3",
   merged: "1.mp3",
+  closed: "4.mp3",
 };
 const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [...STATUS_OPTIONS];
 const STATUS_LABELS = {
@@ -79,7 +89,9 @@ const STATUS_LABELS = {
   // Human‑friendly label for the PR ready status.
   // Shortened label to fit on a single line.
   "pr-ready": "PR ready to view",
+  open: "Open",
   merged: "Merged",
+  closed: "Closed",
 };
 const SOUND_FILE_OPTIONS = [
   "1.mp3",

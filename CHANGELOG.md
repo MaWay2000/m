@@ -1,5 +1,15 @@
 # Changelog
 
+# 1.1.39 - 2025-10-02
+
+* **Support additional task statuses:** Expanded the recognised status list to
+  include GitHub’s **Open** and **Closed** states alongside the existing
+  **Merged** status so manual updates on GitHub flow back into the extension’s
+  history and notifications.
+* **Popup styling for new statuses:** Added dedicated badge styles and labels
+  for the new states so they appear with clear colours in the popup.
+* **Version bumped to 1.1.39.**
+
 # 1.1.38 - 2025-10-02
 
 * **Simplified status table:** Removed the “Merged” row from the
