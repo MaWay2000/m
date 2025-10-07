@@ -18,15 +18,47 @@ const openSettingsButton = document.getElementById("open-settings");
 const autoCreatePrTasks = new Set();
 let autoCreatePrQueue = Promise.resolve();
 const lastKnownTaskStatuses = new Map();
-const COMPLETED_STATUS_KEYS = new Set(["ready", "pr-created", "merged"]);
+// The popup needs to recognise all of the task completion states that the
+// background script can emit. A new status "pr-ready" was introduced when
+// the extension gained the ability to automatically detect when a pull
+// request is ready to view (see background.js). Failing to include
+// "pr-ready" here means tasks in that state won't be treated as completed
+// in the popup, which in turn prevents them from being hidden from the
+// active task list and stops related actions from being available. To
+// keep the popup in sync with the background logic we include "pr-ready"
+// alongside the existing completion statuses.
+const COMPLETED_STATUS_KEYS = new Set(["ready", "pr-created", "pr-ready", "merged"]);
 
-const SOUND_STATUSES = ["ready", "pr-created", "merged"];
+// When a task transitions through various lifecycle states the extension
+// can play notification sounds. The original implementation only
+// accounted for three states (ready, pr-created and merged) which meant
+// that the new "pr-ready" state had no associated sound. This resulted in
+// users receiving silent notifications when a pull request became ready
+// to view. To remedy this we extend the list of sound statuses to
+// include "pr-ready", update the defaults accordingly and include it in
+// the validation set. Users can now customise the sound (or mute it) for
+// this status via the options page.
+const SOUND_STATUSES = ["ready", "pr-created", "pr-ready", "merged"];
 const SOUND_STATUS_STORAGE_KEY = "codexSoundStatuses";
 const SOUND_SELECTION_STORAGE_KEY = "codexSoundSelections";
-const DEFAULT_SOUND_STATUSES = ["ready", "merged"];
+// By default play sounds for all available statuses. Previously only
+// "ready" and "merged" produced sounds by default, but with the
+// introduction of "pr-ready" and explicit support for "pr-created" it
+// makes sense to enable sounds across the board. Users can disable any
+// individual status in the settings UI.
+const DEFAULT_SOUND_STATUSES = [
+  "ready",
+  "pr-created",
+  "pr-ready",
+  "merged",
+];
 const DEFAULT_SOUND_SELECTIONS = {
   ready: "1.mp3",
   "pr-created": "1.mp3",
+  // Default audio file for the PR ready status. Using the same file
+  // avoids unexpected changes for users upgrading from earlier versions
+  // where no sound was played for this status.
+  "pr-ready": "1.mp3",
   merged: "1.mp3",
 };
 const SOUND_STATUS_VALUES = new Set(SOUND_STATUSES);

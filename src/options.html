@@ -106,9 +106,27 @@
               </div>
               <!-- PR ready row -->
               <div class="notification-row" data-status="pr-ready">
-                <div class="status-label">PR ready to view (Open github)</div>
-                <div class="autoclick-cell">
+                <!-- Shorter label to fit on one line -->
+                <div class="status-label">PR ready to view</div>
+                <!-- Auto‑click checkbox with inline delay control. When auto‑click is enabled
+                     for the PR ready status, the delay input determines how long to wait
+                     before clicking the "View PR" button. The delay input remains bound
+                     to the existing id so event handlers continue to function. A unit
+                     label follows the input. -->
+                <div class="autoclick-cell with-delay">
                   <input type="checkbox" name="autoclick-status" value="pr-ready" />
+                  <label class="pr-ready-delay-wrapper" for="pr-ready-delay" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-left: 0.4rem;">
+                    <input
+                      type="number"
+                      id="pr-ready-delay"
+                      name="pr-ready-delay"
+                      min="0"
+                      step="1"
+                      value="3"
+                      style="width: 3rem;"
+                    />
+                    <span class="delay-unit">sec</span>
+                  </label>
                 </div>
                 <div class="popup-cell">
                   <input type="checkbox" name="notification-status" value="pr-ready" />
@@ -142,10 +160,6 @@
               </div>
               <!-- PR ready close tab row (appears inside the same visual group as the PR ready row) -->
               <div class="notification-row pr-ready-close-row" data-status="pr-ready-close">
-                <!-- Span the first three columns for the descriptive label -->
-                <div class="close-tab-label" style="grid-column: span 3; font-size: 0.9rem; color: #475569; padding-left: 0.25rem;">
-                  Close task window when PR ready to view
-                </div>
                 <!-- Checkbox for closing the tab when PR is ready -->
                 <div class="close-tab-input" style="display: flex; justify-content: center; align-items: center;">
                   <input
@@ -154,47 +168,19 @@
                     data-status="pr-ready"
                   />
                 </div>
+                <!-- Span the remaining columns for the descriptive label -->
+                <div class="close-tab-label" style="grid-column: span 3; font-size: 0.9rem; color: #475569; padding-left: 0.25rem;">
+                  Close task window when PR ready to view
+                </div>
               </div>
               <!-- Merged row is intentionally removed; no settings are exposed for this status -->
             </div>
             <!-- End of notification status table -->
 
-            <!-- PR ready auto-click delay configuration -->
-            <div class="delay-setting" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-              <label for="pr-ready-delay" style="white-space: nowrap;">
-                PR ready auto-click delay (seconds):
-              </label>
-              <input
-                type="number"
-                id="pr-ready-delay"
-                name="pr-ready-delay"
-                min="0"
-                step="1"
-                value="3"
-                style="width: 5rem;"
-              />
-            </div>
-            <!-- GitHub merge automation settings -->
-            <div class="gh-merge-settings" style="margin-top: 1rem;">
-              <div class="gh-merge-row">
-                <div class="gh-merge-label">Auto-click "Merge pull request" button</div>
-                <div class="gh-merge-input">
-                  <input type="checkbox" id="auto-merge-pr" name="auto-merge-pr" />
-                </div>
-              </div>
-              <div class="gh-merge-row">
-                <div class="gh-merge-label">Auto-click "Confirm merge" button</div>
-                <div class="gh-merge-input">
-                  <input type="checkbox" id="auto-confirm-merge" name="auto-confirm-merge" />
-                </div>
-              </div>
-              <div class="gh-merge-row gh-close-row">
-                <div class="gh-close-label">Close GitHub window when Confirm merge clicked</div>
-                <div class="gh-close-input">
-                  <input type="checkbox" id="close-github-after-merge" name="close-github-after-merge" />
-                </div>
-              </div>
-            </div>
+            <!-- Removed separate PR ready auto-click delay configuration. The
+                 delay input is now displayed inline within the auto-click
+                 cell of the PR ready row above. -->
+            <!-- GitHub merge automation settings removed -->
           </fieldset>
         </form>
         <p

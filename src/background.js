@@ -55,11 +55,12 @@ let autoClickEnabledStatuses = new Set(DEFAULT_AUTO_CLICK_STATUSES);
 // disable any of these in the settings.
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "pr-created", "pr-ready"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
+  // Default sound selections aligned with the options page. Each status
+  // has a distinct default audio file except merged which reuses the
+  // first sound. Users may customise these selections via the settings.
   ready: "1.mp3",
-  "pr-created": "1.mp3",
-  // Default sound for the PR ready status. Users can override this in
-  // the settings page.
-  "pr-ready": "1.mp3",
+  "pr-created": "2.mp3",
+  "pr-ready": "3.mp3",
   merged: "1.mp3",
 };
 const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [
@@ -68,6 +69,15 @@ const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [
   "pr-ready",
   "merged",
 ];
+
+// -----------------------------------------------------------------------------
+// Merge action sound selection removed
+//
+// Previously the extension allowed configuring different sounds for the
+// "Merge pull request" and "Confirm merge" actions. This functionality has
+// been removed; merge actions now reuse the "merged" status sound. As a
+// result there are no longer separate storage keys, defaults or in‑memory
+// variables for merge sound selections.
 const DEFAULT_NOTIFICATION_DEFAULT_SOUND_MUTED = false;
 
 // Storage key for whether the extension should close the Codex task tab
@@ -201,7 +211,7 @@ const STATUS_LABELS = {
   "pr-created": "PR ready to create",
   // Label for the new PR ready status. Displayed in notifications and
   // settings.
-  "pr-ready": "PR ready to view (Open github)",
+  "pr-ready": "PR ready to view",
   merged: "Merged",
 };
 
@@ -647,6 +657,68 @@ function playBrowserNotificationSound(statusKey) {
 }
 
 /**
+ * Load the selected sound files for GitHub merge actions from storage. This
+ * function reads the stored file names for both the "Merge pull request" and
+ * "Confirm merge" actions. If a stored value is missing or invalid it
+ * falls back to the respective default. Errors during storage access are
+ * logged and cause both selections to revert to defaults. The loaded
+ * selections are stored in the module‑level variables
+ * mergePrSoundSelection and confirmMergeSoundSelection.
+ */
+/* Removed: loadMergeSoundSelections.
+ * Merge actions no longer support per‑action sound selection. The extension
+ * reuses the "merged" status sound for both merge buttons, so there is no
+ * need to load separate preferences from storage. */
+
+/**
+ * Play the notification sound associated with a GitHub merge action. This
+ * mirrors playBrowserNotificationSound but selects the audio file based
+ * on the merge action rather than a status key. When no valid sound is
+ * configured for the action this function does nothing. Audio playback
+ * errors are logged to the console.
+ *
+ * @param {string} action Either 'merge-pr' or 'confirm-merge'.
+ */
+function playMergeNotificationSound(action) {
+  // Always play the sound associated with the "merged" status regardless
+  // of which merge action triggered the notification. This ignores the
+  // user's status sound enabled settings because merge actions have their
+  // own play‑sound toggle. If the merged status sound is invalid or not
+  // available, nothing is played.
+  if (typeof Audio !== "function") {
+    return;
+  }
+  // Determine the sound file to play. Reuse the selection for the
+  // "merged" status, falling back to its default when necessary.
+  const statusKey = "merged";
+  const rawSelection = notificationSoundSelections?.[statusKey];
+  const trimmed = typeof rawSelection === "string" ? rawSelection.trim() : "";
+  const fileName =
+    trimmed && SOUND_FILE_SET.has(trimmed)
+      ? trimmed
+      : DEFAULT_NOTIFICATION_SOUND_SELECTIONS[statusKey];
+  if (!fileName || !SOUND_FILE_SET.has(fileName)) {
+    return;
+  }
+  const url = getSoundFileUrl(fileName);
+  if (!url) {
+    return;
+  }
+  try {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    const playResult = audio.play();
+    if (playResult && typeof playResult.catch === "function") {
+      playResult.catch((error) => {
+        console.error("Failed to play merge notification sound", error);
+      });
+    }
+  } catch (error) {
+    console.error("Failed to play merge notification sound", error);
+  }
+}
+
+/**
  * Display a task status notification by opening a small popup window instead
  * of using the system notification API. This custom implementation avoids
  * playing the host operating system's default sound and gives the
@@ -778,6 +850,10 @@ async function showStatusNotification(task, statusKey) {
 loadNotificationPreferences();
 loadAutoClickPreferences();
 loadPopupPreferences();
+// Load the sound selections for merge actions. This must be done after
+// initialising storage helpers so that playMergeNotificationSound uses
+// the correct values when merge events occur.
+// loadMergeSoundSelections() removed. Merge actions reuse the "merged" status sound.
 
 // Load the preference that determines whether to close the task tab when a
 // pull request becomes ready to view. This is invoked on startup to
@@ -907,6 +983,9 @@ if (storageChangeEmitter) {
       }
     }
 
+    // Merge sound selections have been removed; no need to update per‑action
+    // sound values on storage changes.
+
     // Respond to changes in the preference controlling whether to close
     // the Codex task tab when a pull request becomes ready to view. This
     // ensures updates made in the options page take effect immediately.
@@ -1005,9 +1084,22 @@ function sanitizeTaskName(value) {
 }
 
 function resolveTaskName(candidateName, taskId) {
+  // Attempt to sanitise the provided name. If sanitisation yields a
+  // non-empty value return it. Sanitisation removes common noise and
+  // repository segments but may sometimes be overly aggressive and
+  // produce an empty string. In that case, fall back to the original
+  // candidate name (normalised) before ultimately using the task id.
   const sanitized = sanitizeTaskName(candidateName);
   if (sanitized) {
     return sanitized;
+  }
+  // If candidateName is defined but sanitisation returned an empty
+  // string, return a trimmed and normalised version of candidateName.
+  if (candidateName) {
+    const normalised = String(candidateName).replace(/\s+/g, " ").trim();
+    if (normalised) {
+      return normalised;
+    }
   }
   return taskId ? `Task ${taskId}` : "Unknown task";
 }
@@ -1072,44 +1164,6 @@ console.log("codex-autorun background service worker loaded.");
 runtime.onInstalled.addListener(() => {
   console.log("codex-autorun installed and ready.");
 });
-
-// Listen for messages from other extension contexts (options page, popup, etc.).
-// We add support for a "test-notification" message which triggers a sample
-// notification using the current preferences. The options page sends a
-// list of statuses that should be tested; if none are provided we use
-// whatever notifications are currently enabled in memory.
-if (runtime?.onMessage) {
-  runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || message.type !== "test-notification") {
-      return; // Not our message; ignore.
-    }
-    const statusesFromMsg = Array.isArray(message.statuses)
-      ? message.statuses.filter((s) => typeof s === "string" && STATUS_VALUE_SET.has(s))
-      : [];
-    const statusesToTest = statusesFromMsg.length
-      ? statusesFromMsg
-      : Array.from(notificationEnabledStatuses);
-    const testTask = { name: "Test notification" };
-    Promise.all(
-      statusesToTest.map((statusKey) => {
-        return showStatusNotification(testTask, statusKey);
-      }),
-    )
-      .then(() => {
-        if (typeof sendResponse === "function") {
-          sendResponse({ success: true });
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to dispatch test notification", error);
-        if (typeof sendResponse === "function") {
-          sendResponse({ success: false, error: String(error?.message ?? error) });
-        }
-      });
-    // Return true to keep the response channel open for asynchronous reply.
-    return true;
-  });
-}
 
 function storageGet(key) {
   if (!storage?.local) {
@@ -1628,6 +1682,32 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
+  // Handle test notifications from the options page. This message allows
+  // the options UI to preview the current notification preferences. We
+  // asynchronously show all requested status notifications and then
+  // respond to the sender once complete. Returning true keeps the
+  // response channel open while the promises resolve.
+  if (message.type === "test-notification") {
+    const statusesFromMsg = Array.isArray(message.statuses)
+      ? message.statuses.filter((s) => typeof s === "string" && STATUS_VALUE_SET.has(s))
+      : [];
+    const statusesToTest = statusesFromMsg.length
+      ? statusesFromMsg
+      : Array.from(notificationEnabledStatuses);
+    const testTask = { name: "Test notification" };
+    Promise.all(
+      statusesToTest.map((statusKey) => showStatusNotification(testTask, statusKey)),
+    )
+      .then(() => {
+        sendResponse?.({ success: true });
+      })
+      .catch((error) => {
+        console.error("Failed to dispatch test notification", error);
+        sendResponse?.({ success: false, error: String(error?.message ?? error) });
+      });
+    return true;
+  }
+
   if (message.type === "ping") {
     console.log("Received ping from popup.");
     sendResponse?.({ type: "pong", timestamp: Date.now() });
@@ -1706,6 +1786,126 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse?.({ type: "error", message: String(error) });
       },
     );
+    return true;
+  }
+
+  // Handle notifications for GitHub merge automation actions. When the
+  // merge content script auto‑clicks the "Merge pull request" or
+  // "Confirm merge" buttons it sends a message with the action name
+  // (either 'merge-pr' or 'confirm-merge') and flags indicating whether
+  // a popup or sound should be shown. Respond by playing a sound and/or
+  // opening a custom popup window as requested.
+  if (message.type === "codex-gh-merge-action") {
+    const action = message.action;
+    const showPopup = !!message.showPopup;
+    const playSound = !!message.playSound;
+    // Determine a human friendly title and message based on the action.
+    let title;
+    let body;
+    if (action === "merge-pr") {
+      title = "Pull request merged";
+      body = 'The "Merge pull request" button was clicked automatically.';
+    } else if (action === "confirm-merge") {
+      title = "Merge confirmed";
+      body = 'The "Confirm merge" button was clicked automatically.';
+    } else {
+      title = "Merge action";
+      body = 'A merge action was completed.';
+    }
+    // Play a notification sound if enabled. Reuse the "merged" status
+    // sound for all merge actions. Ignore the notificationSoundEnabledStatuses
+    // setting because merge actions have their own play‑sound toggle.
+    if (playSound) {
+      try {
+        playMergeNotificationSound(action);
+      } catch (err) {
+        console.error("Failed to play merge notification sound", err);
+      }
+    }
+    // Show a custom notification popup if enabled. Reuse the existing
+    // custom-notification.html and styling. The popup will close
+    // automatically after the sound ends or after a fallback timeout. The
+    // audio parameter is only included when a sound should be played to
+    // avoid duplicate playback.
+    if (showPopup) {
+      try {
+        const params = new URLSearchParams();
+        params.set("title", title);
+        params.set("message", body);
+        // Only include the audio parameter when playSound is true. Use the
+        // same file that playMergeNotificationSound() will play: the
+        // selection for the "merged" status, falling back to its default.
+        if (playSound) {
+          const statusKey = "merged";
+          const rawSel = notificationSoundSelections?.[statusKey];
+          const trimmed = typeof rawSel === "string" ? rawSel.trim() : "";
+          let audioFile =
+            trimmed && SOUND_FILE_SET.has(trimmed)
+              ? trimmed
+              : DEFAULT_NOTIFICATION_SOUND_SELECTIONS[statusKey];
+          if (audioFile && SOUND_FILE_SET.has(audioFile)) {
+            const audioUrl = runtime?.getURL
+              ? runtime.getURL(`src/sounds/${audioFile}`)
+              : null;
+            if (audioUrl) {
+              params.set("audio", audioUrl);
+            }
+          }
+        }
+        // Apply custom colours when provided. Use the same variables
+        // controlling popup appearance for status notifications.
+        if (notificationPopupColors?.background) {
+          params.set("bg", notificationPopupColors.background);
+        }
+        if (notificationPopupColors?.page) {
+          params.set("page", notificationPopupColors.page);
+        }
+        if (notificationPopupColors?.text) {
+          params.set("text", notificationPopupColors.text);
+        }
+        const popupUrl = runtime?.getURL
+          ? runtime.getURL(`src/custom-notification.html?${params.toString()}`)
+          : null;
+        const windowsApi =
+          (typeof browser !== "undefined" && browser?.windows) ||
+          (typeof chrome !== "undefined" && chrome?.windows);
+        if (popupUrl && windowsApi?.create) {
+          const width =
+            typeof notificationPopupSize?.width === "number"
+              ? notificationPopupSize.width
+              : 360;
+          const height =
+            typeof notificationPopupSize?.height === "number"
+              ? notificationPopupSize.height
+              : 120;
+          const createOpts = {
+            url: popupUrl,
+            type: "popup",
+            width,
+            height,
+          };
+          // Only set left/top when explicitly defined. Avoid undefined
+          // properties so the browser chooses a sensible default.
+          if (
+            notificationPopupPosition &&
+            typeof notificationPopupPosition.left === "number"
+          ) {
+            createOpts.left = notificationPopupPosition.left;
+          }
+          if (
+            notificationPopupPosition &&
+            typeof notificationPopupPosition.top === "number"
+          ) {
+            createOpts.top = notificationPopupPosition.top;
+          }
+          windowsApi.create(createOpts);
+        }
+      } catch (err) {
+        console.error("Failed to show merge notification popup", err);
+      }
+    }
+    // Always acknowledge the message to avoid leaving the sender waiting.
+    sendResponse?.({ type: "ack" });
     return true;
   }
 

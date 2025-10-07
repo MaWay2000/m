@@ -63,10 +63,13 @@ const NOTIFICATION_SOUND_ENABLED_STORAGE_KEY =
 // view. The user can disable any of these statuses via the settings.
 const DEFAULT_NOTIFICATION_STATUSES = ["ready", "pr-created", "pr-ready"];
 const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
+  // Use distinct default sounds for each status to provide clear
+  // differentiation. The first status plays Sound 1 by default, PR
+  // creation plays Sound 2, PR ready plays Sound 3 and merged reuses
+  // Sound 1. Users can change these selections in the UI.
   ready: "1.mp3",
-  "pr-created": "1.mp3",
-  // Default audio file for the PR ready status. Can be customised in the UI.
-  "pr-ready": "1.mp3",
+  "pr-created": "2.mp3",
+  "pr-ready": "3.mp3",
   merged: "1.mp3",
 };
 const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [...STATUS_OPTIONS];
@@ -74,7 +77,8 @@ const STATUS_LABELS = {
   ready: "Task ready to view",
   "pr-created": "PR ready to create",
   // Human‑friendly label for the PR ready status.
-  "pr-ready": "PR ready to view (Open github)",
+  // Shortened label to fit on a single line.
+  "pr-ready": "PR ready to view",
   merged: "Merged",
 };
 const SOUND_FILE_OPTIONS = [
@@ -128,11 +132,14 @@ let cachedPrReadyCloseTab = DEFAULT_PR_READY_CLOSE_TAB;
 // to close the GitHub tab after confirming the merge. Each preference
 // defaults to true (enabled) so the automation runs out of the box.
 const MERGE_PR_AUTO_CLICK_KEY = "codexMergePrAutoClickEnabled";
-const DEFAULT_MERGE_PR_AUTO_CLICK = true;
+// Disable GitHub merge automation by default. The 'Merge pull request'
+// and 'Confirm merge' rows have been removed from the UI, so these
+// defaults ensure the underlying behaviour is also disabled.
+const DEFAULT_MERGE_PR_AUTO_CLICK = false;
 const CONFIRM_MERGE_AUTO_CLICK_KEY = "codexConfirmMergeAutoClickEnabled";
-const DEFAULT_CONFIRM_MERGE_AUTO_CLICK = true;
+const DEFAULT_CONFIRM_MERGE_AUTO_CLICK = false;
 const CLOSE_GITHUB_AFTER_MERGE_KEY = "codexCloseGithubAfterMergeEnabled";
-const DEFAULT_CLOSE_GITHUB_AFTER_MERGE = true;
+const DEFAULT_CLOSE_GITHUB_AFTER_MERGE = false;
 
 // Cached copies of the GitHub merge automation preferences. These values
 // are updated when loading from storage and when the user toggles the
@@ -141,6 +148,33 @@ const DEFAULT_CLOSE_GITHUB_AFTER_MERGE = true;
 let cachedMergePrAutoClick = DEFAULT_MERGE_PR_AUTO_CLICK;
 let cachedConfirmMergeAutoClick = DEFAULT_CONFIRM_MERGE_AUTO_CLICK;
 let cachedCloseGithubAfterMerge = DEFAULT_CLOSE_GITHUB_AFTER_MERGE;
+
+// Storage keys and defaults for showing a popup and playing a sound when
+// automatically merging pull requests or confirming merges. These
+// preferences are separate from the auto-click toggles and allow the
+// user to choose whether a notification popup or sound should accompany
+// the automation. All default to true to mirror the existing behaviour
+// for other task statuses.
+const MERGE_PR_SHOW_POPUP_KEY = "codexMergePrShowPopupEnabled";
+const DEFAULT_MERGE_PR_SHOW_POPUP = false;
+const MERGE_PR_PLAY_SOUND_KEY = "codexMergePrPlaySoundEnabled";
+const DEFAULT_MERGE_PR_PLAY_SOUND = false;
+const CONFIRM_MERGE_SHOW_POPUP_KEY = "codexConfirmMergeShowPopupEnabled";
+const DEFAULT_CONFIRM_MERGE_SHOW_POPUP = false;
+const CONFIRM_MERGE_PLAY_SOUND_KEY = "codexConfirmMergePlaySoundEnabled";
+const DEFAULT_CONFIRM_MERGE_PLAY_SOUND = false;
+
+// Removed: per‑action merge sound selection keys, defaults and caches. The
+// extension now always uses the "merged" status sound for merge actions, so
+// there is no separate sound preference for merge actions.
+
+// Cached copies of the merge popup/sound preferences. These are
+// initialised with the defaults and updated when loading from storage
+// or when the user toggles the corresponding checkboxes.
+let cachedMergePrShowPopup = DEFAULT_MERGE_PR_SHOW_POPUP;
+let cachedMergePrPlaySound = DEFAULT_MERGE_PR_PLAY_SOUND;
+let cachedConfirmMergeShowPopup = DEFAULT_CONFIRM_MERGE_SHOW_POPUP;
+let cachedConfirmMergePlaySound = DEFAULT_CONFIRM_MERGE_PLAY_SOUND;
 // Keys and defaults for the custom notification popup appearance. These
 // values mirror the constants used in the background script. They
 // control where the custom popup window appears, its size and its
@@ -959,6 +993,121 @@ function applyCloseGithubAfterMerge(value) {
 }
 
 /**
+ * Apply the merge PR show popup preference to the UI and update
+ * the cached value. When enabled the checkbox labelled
+ * "show-merge-pr-popup" is checked.
+ *
+ * @param {any} value
+ */
+function applyMergePrShowPopup(value) {
+  const input = document.getElementById("show-merge-pr-popup");
+  if (!input) {
+    return;
+  }
+  const enabled = Boolean(value);
+  input.checked = enabled;
+  cachedMergePrShowPopup = enabled;
+}
+
+/**
+ * Apply the merge PR play sound preference to the UI and update
+ * the cached value. When enabled the checkbox labelled
+ * "play-merge-pr-sound" is checked.
+ *
+ * @param {any} value
+ */
+function applyMergePrPlaySound(value) {
+  const input = document.getElementById("play-merge-pr-sound");
+  if (!input) {
+    return;
+  }
+  const enabled = Boolean(value);
+  input.checked = enabled;
+  cachedMergePrPlaySound = enabled;
+}
+
+/**
+ * Apply the confirm merge show popup preference to the UI and update
+ * the cached value. When enabled the checkbox labelled
+ * "show-confirm-merge-popup" is checked.
+ *
+ * @param {any} value
+ */
+function applyConfirmMergeShowPopup(value) {
+  const input = document.getElementById("show-confirm-merge-popup");
+  if (!input) {
+    return;
+  }
+  const enabled = Boolean(value);
+  input.checked = enabled;
+  cachedConfirmMergeShowPopup = enabled;
+}
+
+/**
+ * Apply the confirm merge play sound preference to the UI and update
+ * the cached value. When enabled the checkbox labelled
+ * "play-confirm-merge-sound" is checked.
+ *
+ * @param {any} value
+ */
+function applyConfirmMergePlaySound(value) {
+  const input = document.getElementById("play-confirm-merge-sound");
+  if (!input) {
+    return;
+  }
+  const enabled = Boolean(value);
+  input.checked = enabled;
+  cachedConfirmMergePlaySound = enabled;
+}
+
+/**
+ * Apply the merge PR sound selection to the UI and update the cached
+ * value. Accepts any string but normalises it to a valid file name if
+ * possible. When the provided value is not a recognised sound file the
+ * default is used. This function updates the <select> element with id
+ * "merge-pr-sound-select".
+ *
+ * @param {any} value
+ */
+// Removed: applyMergePrSoundSelection and applyConfirmMergeSoundSelection.
+// These functions previously updated per‑action sound dropdowns. Now that
+// per‑action sound selection has been removed, these functions are no longer
+// required.
+
+/**
+ * Load the merge PR sound selection from storage and apply it to the
+ * settings page. Falls back to the default when the stored value is
+ * missing or invalid.
+ */
+// Removed: loadMergePrSoundSelection.
+
+/**
+ * Load the confirm merge sound selection from storage and apply it to
+ * the settings page. Falls back to the default when the stored value
+ * is missing or invalid.
+ */
+// Removed: loadConfirmMergeSoundSelection.
+
+/**
+ * Handle changes to the merge PR sound selection dropdown. Persists the
+ * selected file name in storage and updates the cached value. Displays
+ * a small status message indicating whether the preference was saved
+ * successfully.
+ *
+ * @param {Event} event
+ */
+// Removed: handleMergePrSoundSelectionChange.
+
+/**
+ * Handle changes to the confirm merge sound selection dropdown. Persists
+ * the selected file name in storage and updates the cached value. Displays
+ * a status message when complete.
+ *
+ * @param {Event} event
+ */
+// Removed: handleConfirmMergeSoundSelectionChange.
+
+/**
  * Load the merge PR auto-click preference from storage and apply it to
  * the settings page. Defaults to false when missing or invalid.
  */
@@ -998,6 +1147,64 @@ async function loadCloseGithubAfterMergePreference() {
   } catch (error) {
     console.error("Unable to load close GitHub after merge preference", error);
     applyCloseGithubAfterMerge(DEFAULT_CLOSE_GITHUB_AFTER_MERGE);
+  }
+}
+
+/**
+ * Load the merge PR show popup preference from storage and apply it to
+ * the settings page. Defaults to the defined default when missing
+ * or invalid.
+ */
+async function loadMergePrShowPopupPreference() {
+  try {
+    const stored = await storageGet(MERGE_PR_SHOW_POPUP_KEY);
+    const enabled = typeof stored === "boolean" ? stored : DEFAULT_MERGE_PR_SHOW_POPUP;
+    applyMergePrShowPopup(enabled);
+  } catch (error) {
+    console.error("Unable to load merge PR show-popup preference", error);
+    applyMergePrShowPopup(DEFAULT_MERGE_PR_SHOW_POPUP);
+  }
+}
+
+/**
+ * Load the merge PR play sound preference from storage and apply it.
+ */
+async function loadMergePrPlaySoundPreference() {
+  try {
+    const stored = await storageGet(MERGE_PR_PLAY_SOUND_KEY);
+    const enabled = typeof stored === "boolean" ? stored : DEFAULT_MERGE_PR_PLAY_SOUND;
+    applyMergePrPlaySound(enabled);
+  } catch (error) {
+    console.error("Unable to load merge PR play-sound preference", error);
+    applyMergePrPlaySound(DEFAULT_MERGE_PR_PLAY_SOUND);
+  }
+}
+
+/**
+ * Load the confirm merge show popup preference from storage and apply it.
+ */
+async function loadConfirmMergeShowPopupPreference() {
+  try {
+    const stored = await storageGet(CONFIRM_MERGE_SHOW_POPUP_KEY);
+    const enabled = typeof stored === "boolean" ? stored : DEFAULT_CONFIRM_MERGE_SHOW_POPUP;
+    applyConfirmMergeShowPopup(enabled);
+  } catch (error) {
+    console.error("Unable to load confirm merge show-popup preference", error);
+    applyConfirmMergeShowPopup(DEFAULT_CONFIRM_MERGE_SHOW_POPUP);
+  }
+}
+
+/**
+ * Load the confirm merge play sound preference from storage and apply it.
+ */
+async function loadConfirmMergePlaySoundPreference() {
+  try {
+    const stored = await storageGet(CONFIRM_MERGE_PLAY_SOUND_KEY);
+    const enabled = typeof stored === "boolean" ? stored : DEFAULT_CONFIRM_MERGE_PLAY_SOUND;
+    applyConfirmMergePlaySound(enabled);
+  } catch (error) {
+    console.error("Unable to load confirm merge play-sound preference", error);
+    applyConfirmMergePlaySound(DEFAULT_CONFIRM_MERGE_PLAY_SOUND);
   }
 }
 
@@ -1084,6 +1291,123 @@ async function handleCloseGithubAfterMergeChange(event) {
     console.error("Unable to save close GitHub after merge preference", error);
     showNotificationStatusMessage(
       `Unable to save close GitHub after merge preference: ${error.message}`,
+      true,
+    );
+  }
+}
+
+/**
+ * Handle changes to the merge PR show popup checkbox. Persists the new
+ * value in storage, updates the UI and notifies the user. Uses the
+ * "show-merge-pr-popup" id on the input element.
+ *
+ * @param {Event} event
+ */
+async function handleMergePrShowPopupChange(event) {
+  const input = event?.target;
+  if (!(input instanceof HTMLInputElement) || input.id !== "show-merge-pr-popup") {
+    return;
+  }
+  const enabled = Boolean(input.checked);
+  try {
+    await storageSet(MERGE_PR_SHOW_POPUP_KEY, enabled);
+    applyMergePrShowPopup(enabled);
+    showNotificationStatusMessage(
+      enabled
+        ? 'A popup will be shown when the "Merge pull request" action runs.'
+        : 'Popups for the "Merge pull request" action have been disabled.',
+    );
+  } catch (error) {
+    console.error("Unable to save merge PR show-popup preference", error);
+    showNotificationStatusMessage(
+      `Unable to save preference: ${error.message}`,
+      true,
+    );
+  }
+}
+
+/**
+ * Handle changes to the merge PR play sound checkbox. Persists the new
+ * value in storage, updates the UI and notifies the user.
+ *
+ * @param {Event} event
+ */
+async function handleMergePrPlaySoundChange(event) {
+  const input = event?.target;
+  if (!(input instanceof HTMLInputElement) || input.id !== "play-merge-pr-sound") {
+    return;
+  }
+  const enabled = Boolean(input.checked);
+  try {
+    await storageSet(MERGE_PR_PLAY_SOUND_KEY, enabled);
+    applyMergePrPlaySound(enabled);
+    showNotificationStatusMessage(
+      enabled
+        ? 'A sound will play when the "Merge pull request" action runs.'
+        : 'Sound for the "Merge pull request" action has been disabled.',
+    );
+  } catch (error) {
+    console.error("Unable to save merge PR play-sound preference", error);
+    showNotificationStatusMessage(
+      `Unable to save preference: ${error.message}`,
+      true,
+    );
+  }
+}
+
+/**
+ * Handle changes to the confirm merge show popup checkbox. Persists
+ * the new value in storage, updates the UI and notifies the user.
+ *
+ * @param {Event} event
+ */
+async function handleConfirmMergeShowPopupChange(event) {
+  const input = event?.target;
+  if (!(input instanceof HTMLInputElement) || input.id !== "show-confirm-merge-popup") {
+    return;
+  }
+  const enabled = Boolean(input.checked);
+  try {
+    await storageSet(CONFIRM_MERGE_SHOW_POPUP_KEY, enabled);
+    applyConfirmMergeShowPopup(enabled);
+    showNotificationStatusMessage(
+      enabled
+        ? 'A popup will be shown when the "Confirm merge" action runs.'
+        : 'Popups for the "Confirm merge" action have been disabled.',
+    );
+  } catch (error) {
+    console.error("Unable to save confirm merge show-popup preference", error);
+    showNotificationStatusMessage(
+      `Unable to save preference: ${error.message}`,
+      true,
+    );
+  }
+}
+
+/**
+ * Handle changes to the confirm merge play sound checkbox. Persists
+ * the new value in storage, updates the UI and notifies the user.
+ *
+ * @param {Event} event
+ */
+async function handleConfirmMergePlaySoundChange(event) {
+  const input = event?.target;
+  if (!(input instanceof HTMLInputElement) || input.id !== "play-confirm-merge-sound") {
+    return;
+  }
+  const enabled = Boolean(input.checked);
+  try {
+    await storageSet(CONFIRM_MERGE_PLAY_SOUND_KEY, enabled);
+    applyConfirmMergePlaySound(enabled);
+    showNotificationStatusMessage(
+      enabled
+        ? 'A sound will play when the "Confirm merge" action runs.'
+        : 'Sound for the "Confirm merge" action has been disabled.',
+    );
+  } catch (error) {
+    console.error("Unable to save confirm merge play-sound preference", error);
+    showNotificationStatusMessage(
+      `Unable to save preference: ${error.message}`,
       true,
     );
   }
@@ -1695,26 +2019,8 @@ window.addEventListener("DOMContentLoaded", () => {
     closeTabInput.addEventListener("change", handlePrReadyCloseTabChange);
   }
 
-  // Load GitHub merge automation preferences and wire up handlers. These
-  // preferences control whether the extension automatically clicks the
-  // "Merge pull request" and "Confirm merge" buttons on GitHub, and
-  // whether the GitHub tab should close after the merge is confirmed.
-  loadMergePrAutoClickPreference();
-  loadConfirmMergeAutoClickPreference();
-  loadCloseGithubAfterMergePreference();
-
-  const mergePrInput = document.getElementById("auto-merge-pr");
-  if (mergePrInput) {
-    mergePrInput.addEventListener("change", handleMergePrAutoClickChange);
-  }
-  const confirmMergeInput = document.getElementById("auto-confirm-merge");
-  if (confirmMergeInput) {
-    confirmMergeInput.addEventListener("change", handleConfirmMergeAutoClickChange);
-  }
-  const closeGithubInput = document.getElementById("close-github-after-merge");
-  if (closeGithubInput) {
-    closeGithubInput.addEventListener("change", handleCloseGithubAfterMergeChange);
-  }
+  // GitHub merge automation preferences and UI controls have been removed.
+  // Nothing to load or wire up for merge actions.
 
   // Hook up the test notification button if it exists. This allows
   // users to trigger a sample notification based on their current
