@@ -61,13 +61,17 @@ const DEFAULT_NOTIFICATION_SOUND_SELECTIONS = {
   ready: "1.mp3",
   "pr-created": "2.mp3",
   "pr-ready": "3.mp3",
+  open: "2.mp3",
   merged: "1.mp3",
+  closed: "4.mp3",
 };
 const DEFAULT_NOTIFICATION_SOUND_ENABLED_STATUSES = [
   "ready",
   "pr-created",
   "pr-ready",
+  "open",
   "merged",
+  "closed",
 ];
 
 // -----------------------------------------------------------------------------
@@ -189,7 +193,14 @@ const SOUND_FILE_OPTIONS = [
   "8.mp3",
 ];
 const SOUND_FILE_SET = new Set(SOUND_FILE_OPTIONS);
-const STATUS_VALUE_SET = new Set(["ready", "pr-created", "pr-ready", "merged"]);
+const STATUS_VALUE_SET = new Set([
+  "ready",
+  "pr-created",
+  "pr-ready",
+  "open",
+  "merged",
+  "closed",
+]);
 let notificationEnabledStatuses = new Set(DEFAULT_NOTIFICATION_STATUSES);
 let notificationSoundSelectionOverrides = {};
 let notificationSoundSelections = { ...DEFAULT_NOTIFICATION_SOUND_SELECTIONS };
@@ -212,7 +223,9 @@ const STATUS_LABELS = {
   // Label for the new PR ready status. Displayed in notifications and
   // settings.
   "pr-ready": "PR ready to view",
+  open: "Open",
   merged: "Merged",
+  closed: "Closed",
   "other status": "Other status",
   working: "Working on task",
 };
@@ -1248,7 +1261,14 @@ async function appendHistory(task) {
   console.log("Tracked codex task", entry);
 }
 
-const COMPLETED_STATUS_KEYS = new Set(["ready", "pr-created", "pr-ready", "merged"]);
+const COMPLETED_STATUS_KEYS = new Set([
+  "ready",
+  "pr-created",
+  "pr-ready",
+  "open",
+  "merged",
+  "closed",
+]);
 
 async function updateHistory(task) {
   const id = normalizeTaskId(task?.id);
