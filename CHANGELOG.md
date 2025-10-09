@@ -1,5 +1,11 @@
 # Changelog
 
+# 1.1.44 - 2025-10-03
+
+* **Hide status descriptions in history:** Remove the secondary status label
+  text so task history entries only display the primary status badge.
+* **Version bumped to 1.1.44.**
+
 # 1.1.43 - 2025-10-03
 
 * **Keep ready tasks from masquerading as merged:** Continue scanning all
