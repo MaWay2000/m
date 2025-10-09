@@ -696,41 +696,72 @@ const STATUS_ATTRIBUTE_NAMES = [
   "data-state",
 ];
 const MAX_STATUS_TEXT_LENGTH = 160;
+const STATUS_PRIORITY = {
+  ready: 60,
+  "pr-ready": 50,
+  "pr-created": 40,
+  open: 30,
+  merged: 20,
+  closed: 10,
+  working: 5,
+};
+const HIGHEST_STATUS_PRIORITY = Math.max(0, ...Object.values(STATUS_PRIORITY));
+
+function getStatusPriority(status) {
+  if (!status) {
+    return 0;
+  }
+  return STATUS_PRIORITY[status] ?? 0;
+}
 
 function extractStatusFromElement(element, seenTexts) {
   if (!element) {
     return "";
   }
 
+  let bestStatus = "";
+  let bestPriority = 0;
+
+  const applyCandidate = (status) => {
+    if (!status) {
+      return;
+    }
+    const priority = getStatusPriority(status);
+    if (!bestStatus || priority > bestPriority) {
+      bestStatus = status;
+      bestPriority = priority;
+    }
+  };
+
   const considerText = (text) => {
     if (!text || typeof text !== "string") {
-      return "";
+      return;
     }
     const trimmed = text.replace(/\s+/g, " ").trim();
     if (!trimmed || trimmed.length > MAX_STATUS_TEXT_LENGTH) {
-      return "";
+      return;
     }
     if (seenTexts.has(trimmed)) {
-      return "";
+      return;
     }
     seenTexts.add(trimmed);
     const normalized = normalizeStatusLabel(trimmed);
     if (normalized) {
-      return normalized;
+      applyCandidate(normalized);
+      return;
     }
     const announcement = extractStatusFromAnnouncement(trimmed);
     if (announcement.status) {
-      return announcement.status;
+      applyCandidate(announcement.status);
     }
-    return "";
   };
 
   for (const attribute of STATUS_ATTRIBUTE_NAMES) {
     try {
       const value = element.getAttribute(attribute);
-      const result = considerText(value);
-      if (result) {
-        return result;
+      considerText(value);
+      if (bestPriority === HIGHEST_STATUS_PRIORITY) {
+        return bestStatus;
       }
     } catch (error) {
       // Ignore attribute access errors.
@@ -740,21 +771,18 @@ function extractStatusFromElement(element, seenTexts) {
   if (element.dataset) {
     const datasetValues = [element.dataset.status, element.dataset.state];
     for (const value of datasetValues) {
-      const result = considerText(value);
-      if (result) {
-        return result;
+      considerText(value);
+      if (bestPriority === HIGHEST_STATUS_PRIORITY) {
+        return bestStatus;
       }
     }
   }
 
   if (typeof element.textContent === "string") {
-    const result = considerText(element.textContent);
-    if (result) {
-      return result;
-    }
+    considerText(element.textContent);
   }
 
-  return "";
+  return bestStatus;
 }
 
 function extractStatusFromContainer(container, link) {
@@ -763,6 +791,19 @@ function extractStatusFromContainer(container, link) {
   }
 
   const seenTexts = new Set();
+  let bestStatus = "";
+  let bestPriority = 0;
+
+  const applyCandidate = (status) => {
+    if (!status) {
+      return;
+    }
+    const priority = getStatusPriority(status);
+    if (!bestStatus || priority > bestPriority) {
+      bestStatus = status;
+      bestPriority = priority;
+    }
+  };
 
   const candidates = new Set();
   for (const selector of STATUS_ELEMENT_SELECTORS) {
@@ -778,8 +819,9 @@ function extractStatusFromContainer(container, link) {
       }
       candidates.add(element);
       const status = extractStatusFromElement(element, seenTexts);
-      if (status) {
-        return status;
+      applyCandidate(status);
+      if (bestPriority === HIGHEST_STATUS_PRIORITY) {
+        return bestStatus;
       }
     }
   }
@@ -790,12 +832,13 @@ function extractStatusFromContainer(container, link) {
       continue;
     }
     const status = extractStatusFromElement(element, seenTexts);
-    if (status) {
-      return status;
+    applyCandidate(status);
+    if (bestPriority === HIGHEST_STATUS_PRIORITY) {
+      return bestStatus;
     }
   }
 
-  return "";
+  return bestStatus;
 }
 
 function notifyBackground(task) {

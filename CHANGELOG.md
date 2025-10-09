@@ -1,5 +1,13 @@
 # Changelog
 
+# 1.1.43 - 2025-10-03
+
+* **Keep ready tasks from masquerading as merged:** Continue scanning all
+  status badges on Codex task cards and favour "Task ready to view" and "PR
+  ready" indicators over "Merged" icons so automatic actions trigger and
+  history badges reflect the live state.
+* **Version bumped to 1.1.43.**
+
 # 1.1.42 - 2025-10-03
 
 * **Show closed tasks in history:** Capture Codex status badges on the task list
