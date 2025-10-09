@@ -600,76 +600,6 @@ function openOptionsPage() {
   return Promise.reject(new Error("Options page is unavailable."));
 }
 
-const relativeTimeFormatter =
-  typeof Intl !== "undefined" && typeof Intl.RelativeTimeFormat === "function"
-    ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" })
-    : null;
-
-const absoluteTimeFormatter =
-  typeof Intl !== "undefined" && typeof Intl.DateTimeFormat === "function"
-    ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
-    : null;
-
-function formatRelativeTime(date, now = Date.now()) {
-  const diffMs = date.getTime() - now;
-  const diffSeconds = diffMs / 1000;
-
-  if (!Number.isFinite(diffSeconds)) {
-    return "Unknown";
-  }
-
-  if (Math.abs(diffSeconds) < 30) {
-    return "Just now";
-  }
-
-  if (!relativeTimeFormatter) {
-    return absoluteTimeFormatter
-      ? absoluteTimeFormatter.format(date)
-      : date.toLocaleString();
-  }
-
-  const divisions = [
-    { amount: 60, unit: "second" },
-    { amount: 60, unit: "minute" },
-    { amount: 24, unit: "hour" },
-    { amount: 7, unit: "day" },
-    { amount: 4.34524, unit: "week" },
-    { amount: 12, unit: "month" },
-    { amount: Infinity, unit: "year" },
-  ];
-
-  let duration = diffSeconds;
-  for (const division of divisions) {
-    if (Math.abs(duration) < division.amount) {
-      const rounded = Math.round(duration);
-      if (!rounded) {
-        return "Just now";
-      }
-      return relativeTimeFormatter.format(rounded, division.unit);
-    }
-    duration /= division.amount;
-  }
-
-  return absoluteTimeFormatter ? absoluteTimeFormatter.format(date) : "Unknown";
-}
-
-function formatTimestamp(timestamp) {
-  if (!timestamp) {
-    return { relative: "Unknown", absolute: "" };
-  }
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return { relative: "Unknown", absolute: "" };
-  }
-  const absolute = absoluteTimeFormatter
-    ? absoluteTimeFormatter.format(date)
-    : date.toLocaleString();
-  return {
-    relative: formatRelativeTime(date),
-    absolute,
-  };
-}
-
 function formatStatusLabel(status) {
   if (!status) {
     return "Working";
@@ -892,18 +822,6 @@ function renderHistory(history) {
       idBadge.textContent = "unknown";
     }
 
-    const startedTime = document.createElement("time");
-    startedTime.className = "task-started";
-    if (task?.startedAt) {
-      startedTime.dateTime = task.startedAt;
-    }
-    const { relative: startedLabel, absolute: startedAbsolute } =
-      formatTimestamp(task?.startedAt);
-    startedTime.textContent = startedLabel;
-    if (startedAbsolute) {
-      startedTime.title = startedAbsolute;
-    }
-
     const statusValueRaw = task?.status ? String(task.status) : "working";
     const statusKey = normalizeStatusKey(statusValueRaw) || "working";
 
@@ -941,7 +859,7 @@ function renderHistory(history) {
     statusBadge.textContent = statusDisplay.badge;
     statusContainer.append(statusBadge);
 
-    meta.append(idBadge, startedTime, statusContainer);
+    meta.append(idBadge, statusContainer);
     content.append(meta);
     item.append(content);
 
