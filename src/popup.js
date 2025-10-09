@@ -149,7 +149,52 @@ function normalizeStatusKey(value) {
   if (!value) {
     return "";
   }
-  return String(value).trim().toLowerCase();
+
+  const normalized = String(value).trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+
+  if (Object.prototype.hasOwnProperty.call(STATUS_DISPLAY, normalized)) {
+    return normalized;
+  }
+
+  const simplified = normalized.replace(/[\s_-]+/g, " ").trim();
+
+  if (!simplified) {
+    return "";
+  }
+
+  if (/\bpr ready to view\b/.test(simplified) || simplified === "pr ready") {
+    return "pr-ready";
+  }
+
+  if (/\bpr ready to create\b/.test(simplified) || /\bpr created\b/.test(simplified)) {
+    return "pr-created";
+  }
+
+  if (/\btask ready to view\b/.test(simplified) || /\bready to view\b/.test(simplified) || simplified === "ready") {
+    return "ready";
+  }
+
+  if (/\bmerged\b/.test(simplified)) {
+    return "merged";
+  }
+
+  if (/\bclosed\b/.test(simplified)) {
+    return "closed";
+  }
+
+  if (/\bopen\b/.test(simplified)) {
+    return "open";
+  }
+
+  if (/\bworking\b/.test(simplified)) {
+    return "working";
+  }
+
+  const dashed = simplified.replace(/\s+/g, "-");
+  return dashed || normalized;
 }
 
 function titleCase(value) {
@@ -167,10 +212,18 @@ function resolveStatusDisplay(statusKey) {
     return display;
   }
   const fallback = titleCase(normalized);
+  const otherDisplay = STATUS_DISPLAY["other status"];
+  if (otherDisplay) {
+    return {
+      badge: fallback || otherDisplay.badge,
+      description: fallback || otherDisplay.description,
+      className: otherDisplay.className,
+    };
+  }
   return {
     badge: fallback,
     description: fallback,
-    className: "",
+    className: "task-status--other",
   };
 }
 
