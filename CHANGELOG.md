@@ -1,5 +1,15 @@
 # Changelog
 
+# 1.1.42 - 2025-10-03
+
+* **Show closed tasks in history:** Capture Codex status badges on the task list
+  so history entries advance to **Closed**, **Merged** and other end states even
+  when the conversation page isn’t open.
+* **Preserve status hints during name refreshes:** Carry the latest detected
+  status through the deferred name refresh workflow so late updates keep the
+  correct badge.
+* **Version bumped to 1.1.42.**
+
 # 1.1.41 - 2025-10-02
 
 * **Keep history in sync with Codex:** Recognise the Codex "In Review" status

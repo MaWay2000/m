@@ -364,6 +364,7 @@ function scheduleNameRefresh(taskId, details = {}) {
     startedAt: details.startedAt ?? existing.startedAt ?? null,
     completedAt: details.completedAt ?? existing.completedAt ?? null,
     lastKnownName: details.name ?? existing.lastKnownName ?? null,
+    status: details.status ?? existing.status ?? null,
     missingCount: 0,
   });
 }
@@ -680,6 +681,123 @@ function extractTaskUrl(link) {
   return null;
 }
 
+const STATUS_ELEMENT_SELECTORS = [
+  "[data-testid*='status' i]",
+  "[data-testid*='state' i]",
+  "[data-testid*='badge' i]",
+  "[data-testid*='chip' i]",
+  "[class*='status' i]",
+  "[class*='state' i]",
+];
+const STATUS_ATTRIBUTE_NAMES = [
+  "aria-label",
+  "title",
+  "data-status",
+  "data-state",
+];
+const MAX_STATUS_TEXT_LENGTH = 160;
+
+function extractStatusFromElement(element, seenTexts) {
+  if (!element) {
+    return "";
+  }
+
+  const considerText = (text) => {
+    if (!text || typeof text !== "string") {
+      return "";
+    }
+    const trimmed = text.replace(/\s+/g, " ").trim();
+    if (!trimmed || trimmed.length > MAX_STATUS_TEXT_LENGTH) {
+      return "";
+    }
+    if (seenTexts.has(trimmed)) {
+      return "";
+    }
+    seenTexts.add(trimmed);
+    const normalized = normalizeStatusLabel(trimmed);
+    if (normalized) {
+      return normalized;
+    }
+    const announcement = extractStatusFromAnnouncement(trimmed);
+    if (announcement.status) {
+      return announcement.status;
+    }
+    return "";
+  };
+
+  for (const attribute of STATUS_ATTRIBUTE_NAMES) {
+    try {
+      const value = element.getAttribute(attribute);
+      const result = considerText(value);
+      if (result) {
+        return result;
+      }
+    } catch (error) {
+      // Ignore attribute access errors.
+    }
+  }
+
+  if (element.dataset) {
+    const datasetValues = [element.dataset.status, element.dataset.state];
+    for (const value of datasetValues) {
+      const result = considerText(value);
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  if (typeof element.textContent === "string") {
+    const result = considerText(element.textContent);
+    if (result) {
+      return result;
+    }
+  }
+
+  return "";
+}
+
+function extractStatusFromContainer(container, link) {
+  if (!container) {
+    return "";
+  }
+
+  const seenTexts = new Set();
+
+  const candidates = new Set();
+  for (const selector of STATUS_ELEMENT_SELECTORS) {
+    let elements;
+    try {
+      elements = container.querySelectorAll(selector);
+    } catch (error) {
+      elements = [];
+    }
+    for (const element of elements) {
+      if (!element || candidates.has(element)) {
+        continue;
+      }
+      candidates.add(element);
+      const status = extractStatusFromElement(element, seenTexts);
+      if (status) {
+        return status;
+      }
+    }
+  }
+
+  const fallbackElements = [container, link];
+  for (const element of fallbackElements) {
+    if (!element) {
+      continue;
+    }
+    const status = extractStatusFromElement(element, seenTexts);
+    if (status) {
+      return status;
+    }
+  }
+
+  return "";
+}
+
 function notifyBackground(task) {
   if (!runtime?.sendMessage) {
     return;
@@ -891,6 +1009,7 @@ function scanForTasks() {
       link.closest('[data-testid*="task" i], article, li, section, div') ??
       link.parentElement ??
       link;
+    const statusFromContainer = extractStatusFromContainer(container, link);
     const indicator = findIndicatorElement(container);
     if (indicator) {
       pendingNameRefreshes.delete(taskId);
@@ -900,11 +1019,12 @@ function scanForTasks() {
         const storedName = knownTaskNames.get(taskId) ?? name;
         const url = extractTaskUrl(link);
         const startedAt = new Date().toISOString();
+        const initialStatus = statusFromContainer || "working";
         const task = {
           name: storedName,
           url,
           startedAt,
-          status: "working",
+          status: initialStatus,
           lastSeenAt: now,
           missingSince: null,
         };
@@ -936,6 +1056,11 @@ function scanForTasks() {
           updated = true;
         }
 
+        if (tracked && statusFromContainer && statusFromContainer !== tracked.status) {
+          tracked.status = statusFromContainer;
+          updated = true;
+        }
+
         if (updated && tracked) {
           const updatePayload = {
             id: taskId,
@@ -963,9 +1088,11 @@ function scanForTasks() {
         rememberTaskName(taskId, tracked.name);
       }
       const completedAt = new Date().toISOString();
+      const previousStatus = tracked?.status && tracked.status !== "working" ? tracked.status : null;
+      const resolvedStatus = statusFromContainer || previousStatus || "ready";
       const readyPayload = {
         id: taskId,
-        status: "ready",
+        status: resolvedStatus,
         completedAt,
         name: tracked?.name,
         url: tracked?.url,
@@ -979,6 +1106,7 @@ function scanForTasks() {
           url: readyPayload.url ?? extractTaskUrl(link),
           startedAt: readyPayload.startedAt,
           completedAt,
+          status: resolvedStatus,
         });
       } else {
         pendingNameRefreshes.delete(taskId);
@@ -993,6 +1121,7 @@ function scanForTasks() {
         scheduleNameRefresh(taskId, {
           name: knownName,
           url: extractTaskUrl(link),
+          status: statusFromContainer || null,
         });
         pendingRefresh = pendingNameRefreshes.get(taskId);
       }
@@ -1006,6 +1135,7 @@ function scanForTasks() {
         pendingRefresh.lastKnownName,
       ];
       let resolvedName = null;
+      const updatedStatus = statusFromContainer || pendingRefresh.status || null;
 
       for (const candidate of candidates) {
         if (!candidate) {
@@ -1037,6 +1167,9 @@ function scanForTasks() {
         if (pendingRefresh.completedAt) {
           updatePayload.completedAt = pendingRefresh.completedAt;
         }
+        if (updatedStatus) {
+          updatePayload.status = updatedStatus;
+        }
         pendingNameRefreshes.delete(taskId);
         notifyTaskUpdate(updatePayload);
       } else {
@@ -1046,6 +1179,9 @@ function scanForTasks() {
         const url = extractTaskUrl(link);
         if (url) {
           pendingRefresh.url = url;
+        }
+        if (updatedStatus) {
+          pendingRefresh.status = updatedStatus;
         }
         pendingRefresh.missingCount = 0;
         if (pendingRefresh.attempts >= MAX_NAME_REFRESH_ATTEMPTS) {
@@ -1082,9 +1218,11 @@ function scanForTasks() {
       rememberTaskName(trackedId, tracked.name);
     }
     const completedAt = new Date().toISOString();
+    const inferredStatus =
+      tracked?.status && tracked.status !== "working" ? tracked.status : "ready";
     const readyPayload = {
       id: trackedId,
-      status: "ready",
+      status: inferredStatus,
       completedAt,
       name: tracked?.name,
       url: tracked?.url,
@@ -1098,6 +1236,7 @@ function scanForTasks() {
         url: readyPayload.url,
         startedAt: readyPayload.startedAt,
         completedAt,
+        status: inferredStatus,
       });
     } else {
       pendingNameRefreshes.delete(trackedId);
@@ -1608,7 +1747,8 @@ function checkTaskStatus(taskId, hintedUrl) {
       link.parentElement ??
       link;
     const indicator = findIndicatorElement(container);
-    const status = indicator ? "working" : "ready";
+    const statusFromContainer = extractStatusFromContainer(container, link);
+    const status = statusFromContainer || (indicator ? "working" : "ready");
     const name = extractTaskName(container, link);
     if (name) {
       rememberTaskName(normalizedTaskId, name);
@@ -1623,7 +1763,7 @@ function checkTaskStatus(taskId, hintedUrl) {
       url,
     };
 
-    if (status === "ready") {
+    if (status && status !== "working") {
       payload.completedAt = new Date().toISOString();
     }
 
