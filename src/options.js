@@ -199,9 +199,9 @@ const NOTIFICATION_POPUP_COLORS_STORAGE_KEY = "codexNotificationPopupColors";
 const DEFAULT_NOTIFICATION_POPUP_POSITION = { left: null, top: null };
 const DEFAULT_NOTIFICATION_POPUP_SIZE = { width: 360, height: 120 };
 const DEFAULT_NOTIFICATION_POPUP_COLORS = {
-  background: "#f7fafc",
-  page: "#ffffff",
-  text: "#1a1a1a",
+  background: "#4ade80",
+  page: "#000000",
+  text: "#ffffff",
 };
 
 // Cached popup appearance values. These are populated from storage on
