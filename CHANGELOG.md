@@ -1,5 +1,12 @@
 # Changelog
 
+# 1.1.40 - 2025-10-02
+
+* **Fixed history status display:** Normalised stored status values so history
+  items always map to the correct badge and styling, even when the recorded
+  text contains spaces or punctuation.
+* **Version bumped to 1.1.40.**
+
 # 1.1.39 - 2025-10-02
 
 * **Support additional task statuses:** Expanded the recognised status list to
