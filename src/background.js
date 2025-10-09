@@ -130,6 +130,10 @@ if (alarmsApi?.onAlarm && typeof alarmsApi.onAlarm.addListener === "function") {
     prReadyAlarmTasks.delete(alarm.name);
     const { id, name, url } = taskInfo;
     try {
+      const shouldPromote = await shouldAutoPromoteTaskToPrReady(id);
+      if (!shouldPromote) {
+        return;
+      }
       const completedAt = new Date().toISOString();
       // Persist and notify about the PR ready status. Because the alarm
       // fires independently of the original event page, always call
@@ -1602,6 +1606,26 @@ async function markTaskAsPrReady(task) {
   console.log("Marked Codex task as PR ready", updated);
 }
 
+async function shouldAutoPromoteTaskToPrReady(taskId) {
+  const id = normalizeTaskId(taskId);
+  if (!id) {
+    return false;
+  }
+
+  const history = (await storageGet(HISTORY_KEY)) ?? [];
+  if (!Array.isArray(history) || !history.length) {
+    return false;
+  }
+
+  const entry = history.find((item) => normalizeTaskId(item?.id) === id);
+  if (!entry) {
+    return false;
+  }
+
+  const status = String(entry?.status ?? "").trim().toLowerCase();
+  return status === "pr-created";
+}
+
 async function autoHandleReadyTask(task) {
   if (!task?.id || !task?.url) {
     return;
@@ -1676,25 +1700,36 @@ async function autoHandleReadyTask(task) {
           alarmsApi.create(alarmName, { when: Date.now() + PR_READY_DELAY_MS });
         } else {
           // Fallback: use setTimeout when alarms API is not available.
-        setTimeout(async () => {
-          const completedAtTimeout = new Date().toISOString();
-          await updateHistory({ id: task.id, status: "pr-ready", completedAt: completedAtTimeout });
-          await markTaskAsPrReady({ id: task.id, completedAt: completedAtTimeout });
-          if (notificationEnabledStatuses.has("pr-ready")) {
-            const prReadyTask = {
-              ...task,
+          setTimeout(async () => {
+            const shouldPromote = await shouldAutoPromoteTaskToPrReady(task.id);
+            if (!shouldPromote) {
+              return;
+            }
+            const completedAtTimeout = new Date().toISOString();
+            await updateHistory({
+              id: task.id,
               status: "pr-ready",
               completedAt: completedAtTimeout,
-            };
-            await showStatusNotification(prReadyTask, "pr-ready");
-          }
-          // Optionally close the Codex task tab if the user has enabled
-          // closing on PR ready. The content script will still handle
-          // clicking the "View PR" link within the existing page.
-          if (prReadyCloseTabEnabled) {
-            closeTaskTab(task.id);
-          }
-        }, PR_READY_DELAY_MS);
+            });
+            await markTaskAsPrReady({
+              id: task.id,
+              completedAt: completedAtTimeout,
+            });
+            if (notificationEnabledStatuses.has("pr-ready")) {
+              const prReadyTask = {
+                ...task,
+                status: "pr-ready",
+                completedAt: completedAtTimeout,
+              };
+              await showStatusNotification(prReadyTask, "pr-ready");
+            }
+            // Optionally close the Codex task tab if the user has enabled
+            // closing on PR ready. The content script will still handle
+            // clicking the "View PR" link within the existing page.
+            if (prReadyCloseTabEnabled) {
+              closeTaskTab(task.id);
+            }
+          }, PR_READY_DELAY_MS);
         }
       } catch (err) {
         console.error("Failed to schedule PR ready notification", err);

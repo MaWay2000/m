@@ -223,6 +223,9 @@ function normalizeStatusLabel(label) {
   if (normalized.includes("closed")) {
     return "closed";
   }
+  if (normalized.includes("in review")) {
+    return "open";
+  }
   if (normalized.includes("open")) {
     return "open";
   }

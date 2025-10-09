@@ -1,5 +1,15 @@
 # Changelog
 
+# 1.1.41 - 2025-10-02
+
+* **Keep history in sync with Codex:** Recognise the Codex "In Review" status
+  and persist it as an open pull request instead of prematurely flipping
+  tracked tasks to **PR ready**.
+* **Prevent premature PR ready promotion:** Skip the automatic PR ready update
+  when Codex has already advanced a task beyond the **PR created** state so the
+  stored history reflects the live status accurately.
+* **Version bumped to 1.1.41.**
+
 # 1.1.40 - 2025-10-02
 
 * **Fixed history status display:** Normalised stored status values so history
