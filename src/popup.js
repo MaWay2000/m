@@ -91,7 +91,7 @@ const STATUS_DISPLAY = {
     className: "task-status--ready",
   },
   "pr-created": {
-    badge: "PR ready to create",
+    badge: "PR created",
     description: "PR ready to create",
     className: "task-status--pr-created",
   },
@@ -152,13 +152,21 @@ function normalizeStatusKey(value) {
   return String(value).trim().toLowerCase();
 }
 
+function titleCase(value) {
+  return value
+    .split(/\s+|-/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
 function resolveStatusDisplay(statusKey) {
   const normalized = normalizeStatusKey(statusKey) || "working";
   const display = STATUS_DISPLAY[normalized];
   if (display) {
     return display;
   }
-  const fallback = formatStatusLabel(normalized);
+  const fallback = titleCase(normalized);
   return {
     badge: fallback,
     description: fallback,
