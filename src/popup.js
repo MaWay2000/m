@@ -941,13 +941,6 @@ function renderHistory(history) {
     statusBadge.textContent = statusDisplay.badge;
     statusContainer.append(statusBadge);
 
-    if (statusDisplay.description) {
-      const statusLabel = document.createElement("span");
-      statusLabel.className = "task-status-label";
-      statusLabel.textContent = statusDisplay.description;
-      statusContainer.append(statusLabel);
-    }
-
     meta.append(idBadge, startedTime, statusContainer);
     content.append(meta);
     item.append(content);
