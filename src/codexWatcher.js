@@ -184,6 +184,141 @@ function findIndicatorElement(container) {
   return null;
 }
 
+const STATUS_TEXT_MAX_LENGTH = 120;
+const FINAL_STATUS_KEYS = new Set(["merged", "closed"]);
+const NON_WORKING_STATUS_KEYS = new Set([
+  "ready",
+  "pr-created",
+  "pr-ready",
+  "open",
+  "merged",
+  "closed",
+]);
+
+function normalizeStatusCandidate(value) {
+  if (!value && value !== "") {
+    return "";
+  }
+  const normalized = String(value).replace(/\s+/g, " ").trim();
+  if (!normalized || normalized.length > STATUS_TEXT_MAX_LENGTH) {
+    return "";
+  }
+  return normalized;
+}
+
+function detectStatusFromNormalizedText(text) {
+  if (!text) {
+    return null;
+  }
+  const cleaned = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) {
+    return null;
+  }
+
+  if (/(?:\bpr\s*ready\b|\bready\s*to\s*view\b)/.test(cleaned)) {
+    if (/\bpr\s*ready\b/.test(cleaned)) {
+      return "pr-ready";
+    }
+    if (!/\btask\s*ready\s*to\s*view\b/.test(cleaned)) {
+      return "pr-ready";
+    }
+  }
+  if (/\bpr\s*(?:ready\s*to\s*create|created)\b/.test(cleaned)) {
+    return "pr-created";
+  }
+  if (/\bpull\s*request\s*merged\b/.test(cleaned) || /\bmerged\b/.test(cleaned)) {
+    return "merged";
+  }
+  if (/\bpull\s*request\s*closed\b/.test(cleaned) || /\bclosed\b/.test(cleaned)) {
+    return "closed";
+  }
+  if (/\bpull\s*request\s*open\b/.test(cleaned) || /\bpr\s*open\b/.test(cleaned) || /\bstatus\s*open\b/.test(cleaned) || /\bstate\s*open\b/.test(cleaned)) {
+    return "open";
+  }
+  if (/\btask\s*ready\s*to\s*view\b/.test(cleaned) || (/\bready\b/.test(cleaned) && !/\bpr\s*ready\b/.test(cleaned))) {
+    return "ready";
+  }
+  if (/\bworking\b/.test(cleaned) || /\btask\s*in\s*progress\b/.test(cleaned)) {
+    return "working";
+  }
+  return null;
+}
+
+function extractStatusFromContainer(container, indicator) {
+  if (!container) {
+    return null;
+  }
+
+  const candidates = new Set();
+  const addCandidate = (value) => {
+    const normalized = normalizeStatusCandidate(value);
+    if (normalized) {
+      candidates.add(normalized);
+    }
+  };
+
+  if (indicator) {
+    addCandidate(indicator.getAttribute?.("aria-label"));
+    addCandidate(indicator.getAttribute?.("title"));
+    addCandidate(indicator.textContent);
+  }
+
+  addCandidate(container.getAttribute?.("data-status"));
+  addCandidate(container.getAttribute?.("data-state"));
+  addCandidate(container.getAttribute?.("aria-label"));
+  addCandidate(container.getAttribute?.("title"));
+
+  const STATUS_CANDIDATE_SELECTORS = [
+    "[data-testid*='status' i]",
+    "[data-testid*='state' i]",
+    "[class*='status' i]",
+    "[class*='state' i]",
+    "[class*='badge' i]",
+    "[data-status]",
+    "[data-state]",
+    "[aria-label]",
+    "[title]",
+  ];
+
+  const collectedElements = new Set();
+  for (const selector of STATUS_CANDIDATE_SELECTORS) {
+    if (collectedElements.size > 80) {
+      break;
+    }
+    let found = [];
+    try {
+      found = container.querySelectorAll(selector);
+    } catch (error) {
+      // Ignore invalid selectors and continue with remaining ones.
+      continue;
+    }
+    for (const element of found) {
+      if (!element || collectedElements.has(element)) {
+        continue;
+      }
+      collectedElements.add(element);
+      addCandidate(element.getAttribute?.("data-status"));
+      addCandidate(element.getAttribute?.("data-state"));
+      addCandidate(element.getAttribute?.("aria-label"));
+      addCandidate(element.getAttribute?.("title"));
+      addCandidate(element.textContent);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const status = detectStatusFromNormalizedText(candidate);
+    if (status) {
+      return status;
+    }
+  }
+
+  return null;
+}
+
 function extractTaskId(href) {
   if (!href) {
     return null;
@@ -726,6 +861,60 @@ function notifyTaskUpdate(task) {
   }
 }
 
+function dispatchStatusUpdate(taskId, tracked, status, options = {}) {
+  if (!taskId || !status) {
+    return;
+  }
+
+  const normalizedStatus = String(status).trim().toLowerCase();
+  if (!normalizedStatus) {
+    return;
+  }
+
+  const payload = { id: taskId, status: normalizedStatus };
+  const knownName = tracked?.name ?? knownTaskNames.get(taskId);
+  if (knownName) {
+    payload.name = knownName;
+  }
+  const url = options.url ?? tracked?.url ?? null;
+  if (url) {
+    payload.url = url;
+  }
+  const startedAt = tracked?.startedAt ?? options.startedAt ?? null;
+  if (startedAt) {
+    payload.startedAt = startedAt;
+  }
+
+  if (NON_WORKING_STATUS_KEYS.has(normalizedStatus)) {
+    const completedAtOption = options.completedAt;
+    const completedAt = completedAtOption || tracked?.completedAt || new Date().toISOString();
+    payload.completedAt = completedAt;
+    if (tracked) {
+      tracked.completedAt = completedAt;
+    }
+  }
+
+  if (normalizedStatus === "ready") {
+    notifyTaskReady(payload);
+    const refreshName = knownTaskNames.get(taskId) ?? payload.name ?? null;
+    if (shouldScheduleNameRefresh(refreshName, taskId)) {
+      scheduleNameRefresh(taskId, {
+        name: refreshName,
+        url: payload.url ?? null,
+        startedAt: payload.startedAt ?? null,
+        completedAt: payload.completedAt ?? null,
+      });
+    } else {
+      pendingNameRefreshes.delete(taskId);
+    }
+  } else {
+    notifyTaskUpdate(payload);
+    if (FINAL_STATUS_KEYS.has(normalizedStatus)) {
+      pendingNameRefreshes.delete(taskId);
+    }
+  }
+}
+
 function updateCurrentTaskNameFromConversation() {
   const currentTaskId = extractTaskId(window.location.href);
   if (!currentTaskId) {
@@ -889,6 +1078,7 @@ function scanForTasks() {
       link.parentElement ??
       link;
     const indicator = findIndicatorElement(container);
+    const detectedStatus = extractStatusFromContainer(container, indicator);
     if (indicator) {
       pendingNameRefreshes.delete(taskId);
       if (!trackedTasks.has(taskId)) {
@@ -897,16 +1087,34 @@ function scanForTasks() {
         const storedName = knownTaskNames.get(taskId) ?? name;
         const url = extractTaskUrl(link);
         const startedAt = new Date().toISOString();
+        const status = detectedStatus ?? "working";
         const task = {
           name: storedName,
           url,
           startedAt,
-          status: "working",
+          status,
           lastSeenAt: now,
           missingSince: null,
+          completedAt: null,
         };
+        if (NON_WORKING_STATUS_KEYS.has(status)) {
+          task.completedAt = new Date().toISOString();
+        }
         trackedTasks.set(taskId, task);
         notifyBackground({ id: taskId, ...task });
+        if (status && status !== "working") {
+          const completedAt = task.completedAt ?? new Date().toISOString();
+          dispatchStatusUpdate(taskId, task, status, {
+            url,
+            completedAt,
+          });
+          if (FINAL_STATUS_KEYS.has(status)) {
+            if (task?.name) {
+              rememberTaskName(taskId, task.name);
+            }
+            trackedTasks.delete(taskId);
+          }
+        }
       } else {
         const tracked = trackedTasks.get(taskId);
         if (tracked) {
@@ -933,6 +1141,31 @@ function scanForTasks() {
           updated = true;
         }
 
+        if (tracked) {
+          const previousStatus = tracked.status ?? "working";
+          const nextStatus = detectedStatus ?? previousStatus;
+          if (nextStatus && nextStatus !== previousStatus) {
+            tracked.status = nextStatus;
+            const completedAt =
+              NON_WORKING_STATUS_KEYS.has(nextStatus)
+                ? new Date().toISOString()
+                : null;
+            if (completedAt) {
+              tracked.completedAt = completedAt;
+            }
+            dispatchStatusUpdate(taskId, tracked, nextStatus, {
+              url: tracked.url ?? url ?? extractTaskUrl(link),
+              completedAt: completedAt ?? tracked.completedAt ?? null,
+            });
+            if (FINAL_STATUS_KEYS.has(nextStatus)) {
+              if (tracked?.name) {
+                rememberTaskName(taskId, tracked.name);
+              }
+              trackedTasks.delete(taskId);
+            }
+          }
+        }
+
         if (updated && tracked) {
           const updatePayload = {
             id: taskId,
@@ -947,6 +1180,9 @@ function scanForTasks() {
           if (tracked.startedAt) {
             updatePayload.startedAt = tracked.startedAt;
           }
+          if (tracked.completedAt) {
+            updatePayload.completedAt = tracked.completedAt;
+          }
           notifyTaskUpdate(updatePayload);
           if (!shouldScheduleNameRefresh(updatePayload.name, taskId)) {
             pendingNameRefreshes.delete(taskId);
@@ -955,30 +1191,35 @@ function scanForTasks() {
       }
     } else if (trackedTasks.has(taskId)) {
       const tracked = trackedTasks.get(taskId);
-      trackedTasks.delete(taskId);
-      if (tracked?.name) {
-        rememberTaskName(taskId, tracked.name);
+      if (!tracked) {
+        continue;
       }
-      const completedAt = new Date().toISOString();
-      const readyPayload = {
-        id: taskId,
-        status: "ready",
-        completedAt,
-        name: tracked?.name,
-        url: tracked?.url,
-        startedAt: tracked?.startedAt,
-      };
-      notifyTaskReady(readyPayload);
-      const knownName = knownTaskNames.get(taskId) ?? tracked?.name ?? null;
-      if (shouldScheduleNameRefresh(knownName, taskId)) {
-        scheduleNameRefresh(taskId, {
-          name: knownName,
-          url: readyPayload.url ?? extractTaskUrl(link),
-          startedAt: readyPayload.startedAt,
-          completedAt,
+      tracked.lastSeenAt = now;
+      tracked.missingSince = null;
+      const previousStatus = tracked.status ?? "working";
+      let nextStatus = detectedStatus ?? previousStatus;
+      if (!nextStatus || nextStatus === "working") {
+        nextStatus = previousStatus === "working" ? "ready" : previousStatus;
+      }
+      if (nextStatus !== previousStatus) {
+        tracked.status = nextStatus;
+        const completedAt =
+          NON_WORKING_STATUS_KEYS.has(nextStatus)
+            ? new Date().toISOString()
+            : null;
+        if (completedAt) {
+          tracked.completedAt = completedAt;
+        }
+        dispatchStatusUpdate(taskId, tracked, nextStatus, {
+          url: tracked.url ?? extractTaskUrl(link),
+          completedAt: completedAt ?? tracked.completedAt ?? null,
         });
-      } else {
-        pendingNameRefreshes.delete(taskId);
+        if (FINAL_STATUS_KEYS.has(nextStatus)) {
+          if (tracked?.name) {
+            rememberTaskName(taskId, tracked.name);
+          }
+          trackedTasks.delete(taskId);
+        }
       }
     }
 
