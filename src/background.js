@@ -137,15 +137,10 @@ if (alarmsApi?.onAlarm && typeof alarmsApi.onAlarm.addListener === "function") {
       const completedAt = new Date().toISOString();
       // Persist and notify about the PR ready status. Because the alarm
       // fires independently of the original event page, always call
-      // updateHistory and markTaskAsPrReady here; updateHistory may
-      // dispatch a notification if a status change is detected.
+      // updateHistory and markTaskAsPrReady here; updateHistory handles
+      // dispatching the notification when a status change is detected.
       await updateHistory({ id, status: "pr-ready", completedAt });
       await markTaskAsPrReady({ id, completedAt });
-      // Explicitly notify if enabled to guarantee the user is alerted.
-      if (notificationEnabledStatuses.has("pr-ready")) {
-        const prReadyTask = { id, name, url, status: "pr-ready", completedAt };
-        await showStatusNotification(prReadyTask, "pr-ready");
-      }
       // Optionally close the Codex task tab associated with this task
       // when the pull request is ready to view. This depends on the
       // prReadyCloseTabEnabled preference being true. Closing the tab
@@ -1715,14 +1710,6 @@ async function autoHandleReadyTask(task) {
               id: task.id,
               completedAt: completedAtTimeout,
             });
-            if (notificationEnabledStatuses.has("pr-ready")) {
-              const prReadyTask = {
-                ...task,
-                status: "pr-ready",
-                completedAt: completedAtTimeout,
-              };
-              await showStatusNotification(prReadyTask, "pr-ready");
-            }
             // Optionally close the Codex task tab if the user has enabled
             // closing on PR ready. The content script will still handle
             // clicking the "View PR" link within the existing page.
