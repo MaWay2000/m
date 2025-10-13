@@ -26,6 +26,19 @@ When a tracked task leaves the "working" state, the popup now highlights it as *
 
 The extension remains installed until you restart Firefox. Repeat the steps above to load it again after restarting the browser.
 
+### Update & debug the temporary add-on
+
+- Open `about:debugging#/runtime/this-firefox` to jump straight to the runtime view the next time you start Firefox.
+- After you edit any source files, click **Reload** beside **codex-autorun** in the **Temporary Extensions** list so Firefox picks up your changes without reselecting the manifest.
+- Use the **Inspect** button on the same line to launch DevTools for the background page or popup and review console output while you test.
+- Click the Extensions (puzzle) button in the Firefox toolbar and choose the pin icon next to **codex-autorun** if you want the button to stay visible.
+
+### Package the extension for reuse (optional)
+
+1. Install the [web-ext CLI](https://extensionworkshop.com/documentation/develop/web-ext-command-reference/#web-ext-installation) (`npm install --global web-ext`).
+2. From the project root, run `web-ext build`. The command creates an `.xpi`/`.zip` bundle inside `web-ext-artifacts/`.
+3. Submit the generated archive to [Firefox Add-ons](https://addons.mozilla.org/developers/) or run `web-ext sign` with your Firefox Add-ons credentials to produce a signed build that works outside of temporary installations.
+
 ## Project update rules
 
 To keep the project history consistent:

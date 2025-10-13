@@ -1,5 +1,11 @@
 # Changelog
 
+# 1.1.45 - 2025-10-03
+
+* **Document Firefox setup workflow:** Expanded the README with guidance for reloading the temporary add-on, debugging via
+  DevTools, pinning the toolbar button, and packaging the project with `web-ext`.
+* **Version bumped to 1.1.45.**
+
 # 1.1.44 - 2025-10-03
 
 * **Hide status descriptions in history:** Remove the secondary status label
