@@ -28,6 +28,12 @@ const CURRENT_TASK_WORKING_PATTERNS = [
   /\bworking on your task\b/i,
   /\bcommitting changes?\b/i,
 ];
+const CURRENT_TASK_ACTIVE_CONTROL_SELECTOR = [
+  'button[aria-label*="stop" i]',
+  'button[data-testid*="stop" i]',
+  '[role="progressbar"]',
+  '[aria-busy="true"]',
+].join(", ");
 
 function isTransparentColor(color) {
   if (!color || color === "transparent") {
@@ -1330,10 +1336,10 @@ function detectCurrentTaskStatus() {
     return "working";
   }
 
-  const stopControl = document.querySelector(
-    'button[aria-label*="stop" i], button[data-testid*="stop" i]',
+  const activeTaskControl = document.querySelector(
+    CURRENT_TASK_ACTIVE_CONTROL_SELECTOR,
   );
-  if (stopControl) {
+  if (activeTaskControl) {
     return "working";
   }
 
