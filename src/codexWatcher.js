@@ -1331,11 +1331,6 @@ function detectCurrentTaskStatus() {
     return status;
   }
 
-  const pageText = normalizeTextContent(document.body?.textContent);
-  if (CURRENT_TASK_WORKING_PATTERNS.some((pattern) => pattern.test(pageText))) {
-    return "working";
-  }
-
   const activeTaskControl = document.querySelector(
     CURRENT_TASK_ACTIVE_CONTROL_SELECTOR,
   );
@@ -1343,8 +1338,17 @@ function detectCurrentTaskStatus() {
     return "working";
   }
 
+  const pageText = normalizeTextContent(document.body?.textContent);
   if (CURRENT_TASK_COMPLETION_PATTERNS.some((pattern) => pattern.test(pageText))) {
     return "ready";
+  }
+
+  // Conversation pages keep earlier progress messages in the DOM after a task
+  // completes. Only use those messages as a fallback once live controls and
+  // completion signals have been checked, otherwise stale "working" text can
+  // move a completed task back to the working state.
+  if (CURRENT_TASK_WORKING_PATTERNS.some((pattern) => pattern.test(pageText))) {
+    return "working";
   }
 
   return "working";

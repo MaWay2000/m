@@ -1,5 +1,12 @@
 # Changelog
 
+# 1.2.3 - 2026-09-29
+
+- Keep stale progress messages in a completed conversation from changing the
+  task back to working while still prioritizing live task controls.
+- Add regression coverage for conversations containing both progress and
+  completion text.
+
 # 1.2.2 - 2026-09-29
 
 - Make the update button download the latest source package when the browser
