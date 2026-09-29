@@ -19,6 +19,80 @@ const notifications =
 
 const autoProcessingTasks = new Set();
 
+const GITHUB_MANIFEST_URL =
+  "https://raw.githubusercontent.com/MaWay2000/m/main/manifest.json";
+
+function compareVersions(left, right) {
+  const leftParts = String(left ?? "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = String(right ?? "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(leftParts.length, rightParts.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) {
+      return Math.sign(difference);
+    }
+  }
+  return 0;
+}
+
+async function getGitHubUpdate() {
+  const response = await fetch(GITHUB_MANIFEST_URL, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`GitHub update check failed (${response.status}).`);
+  }
+  const manifest = await response.json();
+  const latestVersion =
+    typeof manifest?.version === "string" ? manifest.version : "";
+  const currentVersion = runtime.getManifest().version;
+  return {
+    available:
+      Boolean(latestVersion) && compareVersions(latestVersion, currentVersion) > 0,
+    currentVersion,
+    latestVersion,
+  };
+}
+
+function requestBrowserUpdateCheck() {
+  if (
+    typeof browser !== "undefined" &&
+    typeof browser?.runtime?.requestUpdateCheck === "function"
+  ) {
+    try {
+      return Promise.resolve(browser.runtime.requestUpdateCheck());
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+  if (
+    typeof chrome === "undefined" ||
+    typeof chrome?.runtime?.requestUpdateCheck !== "function"
+  ) {
+    return Promise.reject(
+      new Error("Automatic updates are not supported by this browser installation."),
+    );
+  }
+  return new Promise((resolve, reject) => {
+    chrome.runtime.requestUpdateCheck((status, details) => {
+      const runtimeError = chrome.runtime?.lastError;
+      if (runtimeError) {
+        reject(new Error(runtimeError.message));
+        return;
+      }
+      resolve({ status, ...details });
+    });
+  });
+}
+
+// Reload only after the browser has fully downloaded and staged the package.
+// This avoids restarting into the old version while an update is still in flight.
+if (runtime.onUpdateAvailable?.addListener) {
+  runtime.onUpdateAvailable.addListener(() => runtime.reload());
+}
+
 const HISTORY_KEY = "codexTaskHistory";
 const CLOSED_TASKS_KEY = "codexClosedTaskIds";
 const NOTIFICATION_STATUS_STORAGE_KEY = "codexNotificationStatuses";
@@ -1756,6 +1830,50 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) => {
         console.error("Failed to dispatch test notification", error);
         sendResponse?.({ success: false, error: String(error?.message ?? error) });
+      });
+    return true;
+  }
+
+  if (message.type === "check-extension-update") {
+    getGitHubUpdate().then(
+      (update) =>
+        sendResponse?.(
+          update.available
+            ? { type: "update-available", version: update.latestVersion }
+            : { type: "up-to-date", version: update.currentVersion },
+        ),
+      (error) => {
+        console.warn("Failed to check GitHub for updates", error);
+        sendResponse?.({
+          type: "error",
+          message: String(error?.message ?? error),
+        });
+      },
+    );
+    return true;
+  }
+
+  if (message.type === "install-extension-update") {
+    getGitHubUpdate()
+      .then((update) => {
+        if (!update.available) {
+          return { type: "up-to-date", version: update.currentVersion };
+        }
+        return requestBrowserUpdateCheck().then((result) => {
+          const status = typeof result === "string" ? result : result?.status;
+          if (status === "throttled" || status === "no_update") {
+            throw new Error(`The browser reported ${status.replace("_", " ")}.`);
+          }
+          return { type: "update-started", version: update.latestVersion };
+        });
+      })
+      .then((response) => sendResponse?.(response))
+      .catch((error) => {
+        console.error("Failed to install extension update", error);
+        sendResponse?.({
+          type: "error",
+          message: String(error?.message ?? error),
+        });
       });
     return true;
   }
