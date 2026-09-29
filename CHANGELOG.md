@@ -1,5 +1,13 @@
 # Changelog
 
+# 1.2.4 - 2026-09-29
+
+- Show the currently installed extension version in the popup.
+- Automatically start browser-managed installation when a newer release is
+  detected, without downloading a source archive.
+- Explain when a temporary or unpacked installation cannot use automatic
+  browser updates.
+
 # 1.2.3 - 2026-09-29
 
 - Keep stale progress messages in a completed conversation from changing the

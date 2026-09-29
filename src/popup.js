@@ -10,6 +10,7 @@ const storageApi =
       : null;
 const refreshButton = document.getElementById("refresh");
 const updateButton = document.getElementById("update-extension");
+const installedVersion = document.getElementById("installed-version");
 const historyList = document.getElementById("history");
 const emptyState = document.getElementById("empty-state");
 const errorOutput = document.getElementById("error");
@@ -570,13 +571,20 @@ async function checkForExtensionUpdate() {
     return;
   }
 
+  const currentVersion = runtime?.getManifest?.().version;
+  if (installedVersion) {
+    installedVersion.textContent = currentVersion
+      ? `Installed version ${currentVersion}`
+      : "Installed version unavailable";
+  }
   updateButton.hidden = true;
   try {
     const response = await sendMessage({ type: "check-extension-update" });
     if (response?.type === "update-available") {
-      updateButton.textContent = `Update to ${response.version}`;
-      updateButton.title = `Install codex-autorun ${response.version} from GitHub`;
+      updateButton.textContent = `Updating to ${response.version}…`;
+      updateButton.title = `Browser-managed update to codex-autorun ${response.version}`;
       updateButton.hidden = false;
+      await handleExtensionUpdate();
     }
   } catch (error) {
     // Update checks should not interfere with the popup's primary task-history
@@ -600,11 +608,10 @@ async function handleExtensionUpdate() {
       updateButton.textContent = "Restarting…";
       return;
     }
-    if (response?.type === "update-downloaded") {
-      errorOutput.classList.add("update-help");
-      errorOutput.textContent =
-        "Update downloaded. Extract it, then reload the extension from your browser's extensions page.";
-      updateButton.textContent = "Downloaded";
+    if (response?.type === "automatic-update-unavailable") {
+      errorOutput.textContent = response.message;
+      updateButton.textContent = "Retry update";
+      updateButton.disabled = false;
       return;
     }
     throw new Error(
