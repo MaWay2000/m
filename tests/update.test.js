@@ -11,7 +11,6 @@ assert.notEqual(
 );
 
 const updateChecks = [];
-const openedTabs = [];
 const context = {
   browser: {
     runtime: {
@@ -24,12 +23,7 @@ const context = {
       },
     },
     storage: {},
-    tabs: {
-      create: async (properties) => {
-        openedTabs.push(properties);
-        return { id: 1 };
-      },
-    },
+    tabs: {},
     notifications: {},
   },
   chrome: undefined,
@@ -60,12 +54,8 @@ assert.equal(context.helpers.compareVersions("1.1.9", "1.2.0"), -1);
 
   context.browser.runtime.requestUpdateCheck = undefined;
   const fallback = await context.helpers.installExtensionUpdate(update);
-  assert.equal(fallback.type, "update-downloaded");
-  assert.equal(openedTabs.length, 1);
-  assert.equal(
-    openedTabs[0].url,
-    "https://github.com/MaWay2000/m/archive/refs/heads/main.zip",
-  );
+  assert.equal(fallback.type, "automatic-update-unavailable");
+  assert.match(fallback.message, /signed\/store release/);
   console.log("extension update regression test passed");
 })().catch((error) => {
   console.error(error);

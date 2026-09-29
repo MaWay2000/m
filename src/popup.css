@@ -38,6 +38,17 @@ main {
   margin: 0;
 }
 
+.product-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.version {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
 .description {
   margin: 0;
   color: #475569;

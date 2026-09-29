@@ -21,8 +21,6 @@ const autoProcessingTasks = new Set();
 
 const GITHUB_MANIFEST_URL =
   "https://raw.githubusercontent.com/MaWay2000/m/main/manifest.json";
-const GITHUB_SOURCE_ARCHIVE_URL =
-  "https://github.com/MaWay2000/m/archive/refs/heads/main.zip";
 
 function compareVersions(left, right) {
   const leftParts = String(left ?? "")
@@ -89,32 +87,6 @@ function requestBrowserUpdateCheck() {
   });
 }
 
-function openUpdateArchive() {
-  if (typeof browser !== "undefined" && browser?.tabs?.create) {
-    try {
-      return Promise.resolve(
-        browser.tabs.create({ url: GITHUB_SOURCE_ARCHIVE_URL, active: false }),
-      );
-    } catch (error) {
-      return Promise.reject(error);
-    }
-  }
-
-  if (typeof chrome === "undefined" || !chrome?.tabs?.create) {
-    return Promise.reject(new Error("The update download could not be opened."));
-  }
-  return new Promise((resolve, reject) => {
-    chrome.tabs.create({ url: GITHUB_SOURCE_ARCHIVE_URL, active: false }, (tab) => {
-      const runtimeError = chrome.runtime?.lastError;
-      if (runtimeError) {
-        reject(new Error(runtimeError.message));
-        return;
-      }
-      resolve(tab);
-    });
-  });
-}
-
 async function installExtensionUpdate(update) {
   try {
     const result = await requestBrowserUpdateCheck();
@@ -124,16 +96,20 @@ async function installExtensionUpdate(update) {
     }
   } catch (error) {
     console.info(
-      "Browser-managed updates are unavailable; downloading the update instead.",
+      "Browser-managed updates are unavailable for this installation.",
       error,
     );
   }
 
-  // Unpacked and temporary extensions cannot be replaced by WebExtension code.
-  // Starting the source download still makes the Update button useful, while
-  // the popup can clearly tell the user that the downloaded copy must be loaded.
-  await openUpdateArchive();
-  return { type: "update-downloaded", version: update.latestVersion };
+  // WebExtensions cannot replace their own files. Store-installed and signed
+  // extensions are updated by the browser; temporary/unpacked copies must be
+  // installed through a managed distribution channel before that can work.
+  return {
+    type: "automatic-update-unavailable",
+    version: update.latestVersion,
+    message:
+      "Automatic updates are unavailable for this temporary or unpacked installation. Install a signed/store release once to enable browser-managed updates.",
+  };
 }
 
 // Reload only after the browser has fully downloaded and staged the package.
