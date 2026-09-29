@@ -18,6 +18,16 @@ const NAME_REFRESH_INTERVAL_MS = 60 * 1000;
 const MAX_NAME_REFRESH_ATTEMPTS = 30;
 const MAX_NAME_REFRESH_MISSES = 30;
 const WORKING_TASK_MISSING_GRACE_MS = 15 * 60 * 1000;
+const CURRENT_TASK_COMPLETION_PATTERNS = [
+  /\bworked for\b/i,
+  /\btask completed\b/i,
+  /\bcreate (?:a )?(?:pull request|pr)\b/i,
+  /\bview (?:pull request|pr)\b/i,
+];
+const CURRENT_TASK_WORKING_PATTERNS = [
+  /\bworking on your task\b/i,
+  /\bcommitting changes?\b/i,
+];
 
 function isTransparentColor(color) {
   if (!color || color === "transparent") {
@@ -1236,6 +1246,11 @@ function scanForTasks() {
     }
   }
 
+  // A task detail route does not necessarily contain a link back to itself.
+  // Modern Codex pages commonly render only the conversation, so the link-only
+  // scan above otherwise leaves the popup empty even while this page is open.
+  scanCurrentTaskPage(seenIds, now);
+
   for (const trackedId of Array.from(trackedTasks.keys())) {
     if (seenIds.has(trackedId)) {
       continue;
@@ -1302,6 +1317,71 @@ function scanForTasks() {
 
   updateCurrentTaskNameFromConversation();
   scanConversationForStatusAnnouncements();
+}
+
+function detectCurrentTaskStatus() {
+  const status = extractStatusFromContainer(document.body, null);
+  if (status) {
+    return status;
+  }
+
+  const pageText = normalizeTextContent(document.body?.textContent);
+  if (CURRENT_TASK_WORKING_PATTERNS.some((pattern) => pattern.test(pageText))) {
+    return "working";
+  }
+
+  const stopControl = document.querySelector(
+    'button[aria-label*="stop" i], button[data-testid*="stop" i]',
+  );
+  if (stopControl) {
+    return "working";
+  }
+
+  if (CURRENT_TASK_COMPLETION_PATTERNS.some((pattern) => pattern.test(pageText))) {
+    return "ready";
+  }
+
+  return "working";
+}
+
+function scanCurrentTaskPage(seenIds, now) {
+  const taskId = extractTaskId(window.location.href);
+  if (!taskId || seenIds.has(taskId)) {
+    return;
+  }
+
+  seenIds.add(taskId);
+  const status = detectCurrentTaskStatus();
+  const name =
+    extractConversationTaskName() ||
+    knownTaskNames.get(taskId) ||
+    normalizeTaskText(document.title) ||
+    `Task ${taskId}`;
+  rememberTaskName(taskId, name);
+
+  const previous = trackedTasks.get(taskId);
+  const task = {
+    name: knownTaskNames.get(taskId) || name,
+    url: window.location.href,
+    startedAt: previous?.startedAt || new Date().toISOString(),
+    status,
+    lastSeenAt: now,
+    missingSince: null,
+  };
+  trackedTasks.set(taskId, task);
+
+  if (!previous) {
+    notifyBackground({ id: taskId, ...task });
+    return;
+  }
+
+  if (previous.status !== status || previous.name !== task.name) {
+    const update = { id: taskId, ...task };
+    if (status !== "working") {
+      update.completedAt = new Date().toISOString();
+    }
+    notifyTaskUpdate(update);
+  }
 }
 
 function elementTextMatches(element, text) {
@@ -1826,4 +1906,3 @@ function checkTaskStatus(taskId, hintedUrl) {
   const storedName = knownTaskNames.get(normalizedTaskId) ?? null;
   return { found: false, name: storedName };
 }
-
