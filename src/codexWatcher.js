@@ -21,8 +21,6 @@ const WORKING_TASK_MISSING_GRACE_MS = 15 * 60 * 1000;
 const CURRENT_TASK_COMPLETION_PATTERNS = [
   /\bworked for\b/i,
   /\btask completed\b/i,
-  /\bcreate (?:a )?(?:pull request|pr)\b/i,
-  /\bview (?:pull request|pr)\b/i,
 ];
 const CURRENT_TASK_WORKING_PATTERNS = [
   /\bworking on your task\b/i,
@@ -1325,8 +1323,70 @@ function scanForTasks() {
   scanConversationForStatusAnnouncements();
 }
 
+function extractExplicitCurrentTaskStatus() {
+  const seenTexts = new Set();
+  let bestStatus = "";
+  let bestPriority = 0;
+
+  const applyCandidate = (status) => {
+    const priority = getStatusPriority(status);
+    if (status && (!bestStatus || priority > bestPriority)) {
+      bestStatus = status;
+      bestPriority = priority;
+    }
+  };
+
+  // The body text contains the user's prompt, so treating it as a status can
+  // turn requests containing words such as "open" or "PR created" into false
+  // lifecycle updates. Only inspect status-like descendants and body metadata.
+  for (const selector of STATUS_ELEMENT_SELECTORS) {
+    let elements = [];
+    try {
+      elements = document.querySelectorAll(selector);
+    } catch (error) {
+      // Continue when a site-provided DOM shim rejects a selector.
+    }
+    for (const element of elements) {
+      applyCandidate(extractStatusFromElement(element, seenTexts));
+    }
+  }
+
+  for (const attribute of STATUS_ATTRIBUTE_NAMES) {
+    try {
+      applyCandidate(normalizeStatusLabel(document.body?.getAttribute(attribute)));
+    } catch (error) {
+      // Ignore missing or inaccessible body attributes.
+    }
+  }
+
+  return bestStatus;
+}
+
+function getCurrentTaskActivityText() {
+  let pageText = normalizeTextContent(document.body?.textContent);
+  if (!pageText) {
+    return "";
+  }
+
+  // Completion phrases can legitimately occur in the task request. Remove
+  // user-authored messages before applying the fallback text heuristics.
+  const userMessages = new Set();
+  for (const selector of CONVERSATION_TASK_SELECTORS) {
+    for (const element of document.querySelectorAll(selector)) {
+      userMessages.add(element);
+    }
+  }
+  for (const element of userMessages) {
+    const userText = normalizeTextContent(element?.textContent);
+    if (userText) {
+      pageText = pageText.split(userText).join(" ");
+    }
+  }
+  return normalizeTextContent(pageText);
+}
+
 function detectCurrentTaskStatus() {
-  const status = extractStatusFromContainer(document.body, null);
+  const status = extractExplicitCurrentTaskStatus();
   if (status) {
     return status;
   }
@@ -1338,7 +1398,7 @@ function detectCurrentTaskStatus() {
     return "working";
   }
 
-  const pageText = normalizeTextContent(document.body?.textContent);
+  const pageText = getCurrentTaskActivityText();
   if (CURRENT_TASK_COMPLETION_PATTERNS.some((pattern) => pattern.test(pageText))) {
     return "ready";
   }

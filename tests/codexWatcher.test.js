@@ -21,11 +21,20 @@ const userMessage = {
   querySelector() {
     return null;
   },
+  get textContent() {
+    return this.childNodes.map((child) => child.textContent).join("");
+  },
 };
 userMessage.childNodes[0].parentElement = userMessage;
 
-function runScenario({ pageText, activeControl = false, bodyStatus = "" }) {
+function runScenario({
+  pageText,
+  activeControl = false,
+  bodyStatus = "",
+  userText = "Write unit tests for the new feature",
+}) {
   const messages = [];
+  userMessage.childNodes[0].textContent = userText;
   const body = {
     nodeType: 1,
     tagName: "BODY",
@@ -125,6 +134,22 @@ assert.equal(
   })[0].task.status,
   "ready",
   "an explicit page status takes priority over working signals",
+);
+assert.equal(
+  runScenario({
+    pageText: "Open the project and report whether the PR was created",
+    userText: "Open the project and report whether the PR was created",
+  })[0].task.status,
+  "working",
+  "status words in a user prompt are not treated as page metadata",
+);
+assert.equal(
+  runScenario({
+    pageText: "Explain the task completed message and the worked for timer",
+    userText: "Explain the task completed message and the worked for timer",
+  })[0].task.status,
+  "working",
+  "completion phrases in a user prompt do not mark the task ready",
 );
 
 console.log("codexWatcher current-page regression test passed");

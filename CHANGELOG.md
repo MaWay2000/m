@@ -1,5 +1,14 @@
 # Changelog
 
+# 1.2.5 - 2026-09-29
+
+- Prevent task prompts containing status words such as "Open" or "PR created"
+  from being interpreted as explicit task states.
+- Exclude user-authored prompt text from completion detection so requests that
+  mention completion messages or timers remain in progress until the page
+  supplies an actual completion signal.
+- Add regression coverage for both status and completion phrases in prompts.
+
 # 1.2.4 - 2026-09-29
 
 - Show the currently installed extension version in the popup.
