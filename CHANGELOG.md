@@ -1,5 +1,10 @@
 # Changelog
 
+# 1.2.6 - 2026-09-29
+
+- Publish a small version-only release to verify that signed installations
+  receive browser-managed automatic updates.
+
 # 1.2.5 - 2026-09-29
 
 - Prevent task prompts containing status words such as "Open" or "PR created"
