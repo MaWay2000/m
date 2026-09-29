@@ -1363,23 +1363,55 @@ function extractExplicitCurrentTaskStatus() {
 }
 
 function getCurrentTaskActivityText() {
-  let pageText = normalizeTextContent(document.body?.textContent);
-  if (!pageText) {
+  const body = document.body;
+  if (!body) {
     return "";
   }
 
-  // Completion phrases can legitimately occur in the task request. Remove
-  // user-authored messages before applying the fallback text heuristics.
+  // Completion phrases can legitimately occur in the task request. Exclude
+  // user-authored subtrees before applying the fallback text heuristics. Do
+  // not remove their text from the flattened body string: the same sentence
+  // may also appear in a genuine status or assistant message, and replacing
+  // every matching occurrence would hide that signal as well.
   const userMessages = new Set();
   for (const selector of CONVERSATION_TASK_SELECTORS) {
-    for (const element of document.querySelectorAll(selector)) {
-      userMessages.add(element);
+    try {
+      for (const element of document.querySelectorAll(selector)) {
+        userMessages.add(element);
+      }
+    } catch (error) {
+      // Continue when a site-provided DOM shim rejects a selector.
     }
   }
+
+  if (body.childNodes && typeof body.childNodes[Symbol.iterator] === "function") {
+    const textParts = [];
+    const collectText = (node) => {
+      if (!node || userMessages.has(node)) {
+        return;
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        textParts.push(node.textContent || "");
+        return;
+      }
+      if (!node.childNodes) {
+        return;
+      }
+      for (const child of node.childNodes) {
+        collectText(child);
+      }
+    };
+    collectText(body);
+    return normalizeTextContent(textParts.join(" "));
+  }
+
+  // Retain a fallback for lightweight DOM implementations that expose only
+  // textContent (including older embedded pages and the regression harness).
+  let pageText = normalizeTextContent(body.textContent);
   for (const element of userMessages) {
     const userText = normalizeTextContent(element?.textContent);
     if (userText) {
-      pageText = pageText.split(userText).join(" ");
+      pageText = pageText.replace(userText, " ");
     }
   }
   return normalizeTextContent(pageText);

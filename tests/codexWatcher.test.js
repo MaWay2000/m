@@ -32,6 +32,7 @@ function runScenario({
   activeControl = false,
   bodyStatus = "",
   userText = "Write unit tests for the new feature",
+  structuredBody = false,
 }) {
   const messages = [];
   userMessage.childNodes[0].textContent = userText;
@@ -47,6 +48,12 @@ function runScenario({
     },
     dataset: bodyStatus ? { status: bodyStatus } : {},
   };
+  if (structuredBody) {
+    body.childNodes = [
+      userMessage,
+      { nodeType: 3, textContent: pageText, childNodes: [] },
+    ];
+  }
   const document = {
     body,
     title: "Write unit tests for new feature",
@@ -150,6 +157,15 @@ assert.equal(
   })[0].task.status,
   "working",
   "completion phrases in a user prompt do not mark the task ready",
+);
+assert.equal(
+  runScenario({
+    pageText: "Task completed.",
+    userText: "Task completed.",
+    structuredBody: true,
+  })[0].task.status,
+  "ready",
+  "matching assistant text remains visible when user prompt text is excluded",
 );
 
 console.log("codexWatcher current-page regression test passed");
