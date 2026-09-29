@@ -1,14 +1,15 @@
 {
   "manifest_version": 2,
   "name": "codex-autorun",
-  "version": "1.1.46",
+  "version": "1.2.0",
   "description": "The codex-autorun WebExtension with background script and popup.",
   "permissions": [
     "storage",
     "tabs",
     "notifications",
     "https://chatgpt.com/*",
-    "https://debuggpt.tools/*"
+    "https://debuggpt.tools/*",
+    "https://raw.githubusercontent.com/MaWay2000/m/main/manifest.json"
   ],
   "icons": {
     "16": "src/icons/icon-16.png",

@@ -1,5 +1,11 @@
 # Changelog
 
+# 1.2.0 - 2026-09-29
+
+- Add an update button that appears only when the GitHub version is newer.
+- Ask the browser to install the latest update and reload the extension only after
+  the updated package has finished downloading.
+
 # 1.1.46 - 2026-09-29
 
 - Detect task detail pages even when the page does not contain a task-list link

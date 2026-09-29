@@ -9,6 +9,7 @@ const storageApi =
       ? chrome.storage
       : null;
 const refreshButton = document.getElementById("refresh");
+const updateButton = document.getElementById("update-extension");
 const historyList = document.getElementById("history");
 const emptyState = document.getElementById("empty-state");
 const errorOutput = document.getElementById("error");
@@ -564,6 +565,51 @@ function sendMessage(message) {
   return Promise.reject(new Error("Runtime messaging is unavailable."));
 }
 
+async function checkForExtensionUpdate() {
+  if (!updateButton) {
+    return;
+  }
+
+  updateButton.hidden = true;
+  try {
+    const response = await sendMessage({ type: "check-extension-update" });
+    if (response?.type === "update-available") {
+      updateButton.textContent = `Update to ${response.version}`;
+      updateButton.title = `Install codex-autorun ${response.version} from GitHub`;
+      updateButton.hidden = false;
+    }
+  } catch (error) {
+    // Update checks should not interfere with the popup's primary task-history
+    // UI.
+    console.warn("Failed to check for an extension update", error);
+  }
+}
+
+async function handleExtensionUpdate() {
+  if (!updateButton) {
+    return;
+  }
+
+  updateButton.disabled = true;
+  updateButton.textContent = "Updating…";
+  errorOutput.textContent = "";
+  try {
+    const response = await sendMessage({ type: "install-extension-update" });
+    if (response?.type === "update-started") {
+      updateButton.textContent = "Restarting…";
+      return;
+    }
+    throw new Error(
+      response?.message ?? "The browser could not start the update.",
+    );
+  } catch (error) {
+    console.error("Failed to update extension", error);
+    errorOutput.textContent = `Unable to update: ${error.message}`;
+    updateButton.textContent = "Retry update";
+    updateButton.disabled = false;
+  }
+}
+
 function openOptionsPage() {
   if (typeof browser !== "undefined" && browser?.runtime?.openOptionsPage) {
     try {
@@ -992,8 +1038,10 @@ refreshButton?.addEventListener("click", () => {
 });
 
 openSettingsButton?.addEventListener("click", handleOpenSettingsClick);
+updateButton?.addEventListener("click", handleExtensionUpdate);
 
 window.addEventListener("DOMContentLoaded", () => {
+  checkForExtensionUpdate();
   loadSoundPreferences()
     .catch((error) => {
       console.error("Failed to prepare sound preferences", error);
