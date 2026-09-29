@@ -592,6 +592,7 @@ async function handleExtensionUpdate() {
 
   updateButton.disabled = true;
   updateButton.textContent = "Updating…";
+  errorOutput.classList.remove("update-help");
   errorOutput.textContent = "";
   try {
     const response = await sendMessage({ type: "install-extension-update" });
@@ -599,11 +600,19 @@ async function handleExtensionUpdate() {
       updateButton.textContent = "Restarting…";
       return;
     }
+    if (response?.type === "update-downloaded") {
+      errorOutput.classList.add("update-help");
+      errorOutput.textContent =
+        "Update downloaded. Extract it, then reload the extension from your browser's extensions page.";
+      updateButton.textContent = "Downloaded";
+      return;
+    }
     throw new Error(
       response?.message ?? "The browser could not start the update.",
     );
   } catch (error) {
     console.error("Failed to update extension", error);
+    errorOutput.classList.remove("update-help");
     errorOutput.textContent = `Unable to update: ${error.message}`;
     updateButton.textContent = "Retry update";
     updateButton.disabled = false;
