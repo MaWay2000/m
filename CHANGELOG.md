@@ -1,5 +1,12 @@
 # Changelog
 
+# 1.2.1 - 2026-09-29
+
+- Recognize active progress controls on open Codex task pages while continuing
+  to prefer explicit page status metadata.
+- Expand current-task regression coverage and record the completed automated
+  items in the fix plan.
+
 # 1.2.0 - 2026-09-29
 
 - Add an update button that appears only when the GitHub version is newer.
