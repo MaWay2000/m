@@ -104,6 +104,21 @@ assert.equal(
 );
 assert.equal(
   runScenario({
+    pageText: "Working on your task. Worked for 1m 5s. Task completed.",
+  })[0].task.status,
+  "ready",
+  "completion text wins over stale progress messages",
+);
+assert.equal(
+  runScenario({
+    pageText: "Worked for 1m 5s on the previous run",
+    activeControl: true,
+  })[0].task.status,
+  "working",
+  "a live task control wins over historical completion text",
+);
+assert.equal(
+  runScenario({
     pageText: "Working on your task",
     activeControl: true,
     bodyStatus: "Task ready to view",

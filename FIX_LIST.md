@@ -7,6 +7,9 @@
    attributes supplied by the page.
 3. **Done — add regression coverage.** Exercise a task conversation page with
    no task-list links and verify that it is sent to extension history.
-4. **Manual verification remaining.** Reload the temporary
+4. **Done — ignore stale progress messages.** Prefer completion text over old
+   progress messages retained in the conversation, unless a live task control
+   shows that another run is active.
+5. **Manual verification remaining.** Reload the temporary
    add-on, refresh an existing Codex task tab, and confirm it appears in the
    popup without requiring a working-indicator square.
