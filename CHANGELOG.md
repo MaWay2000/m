@@ -1,5 +1,12 @@
 # Changelog
 
+# 1.1.46 - 2026-09-29
+
+- Detect task detail pages even when the page does not contain a task-list link
+  or the legacy working-indicator square.
+- Add regression coverage for current-page detection and a prioritized follow-up
+  fix list.
+
 # 1.1.45 - 2025-10-03
 
 * **Document Firefox setup workflow:** Expanded the README with guidance for reloading the temporary add-on, debugging via
