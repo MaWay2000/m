@@ -1,5 +1,12 @@
 # Changelog
 
+# 1.2.2 - 2026-09-29
+
+- Make the update button download the latest source package when the browser
+  cannot automatically update a temporary or unpacked extension.
+- Explain how to finish installing a downloaded update instead of reporting the
+  browser's unsupported-update API as a failure.
+
 # 1.2.1 - 2026-09-29
 
 - Recognize active progress controls on open Codex task pages while continuing
