@@ -1,5 +1,12 @@
 # Changelog
 
+# 1.2.7 - 2026-09-29
+
+- Exclude user-message DOM subtrees from task-status detection without also
+  removing identical completion text rendered by the assistant or page UI.
+- Make user-message discovery tolerate unsupported selectors and add regression
+  coverage for repeated prompt and completion text.
+
 # 1.2.6 - 2026-09-29
 
 - Publish a small version-only release to verify that signed installations
