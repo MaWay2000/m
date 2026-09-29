@@ -19,6 +19,18 @@ The extension reads page interfaces rather than providing an authoritative GitHu
 
 ## Install in Firefox
 
+### Signed beta (recommended)
+
+Download `codex-autorun-<version>.xpi` from the latest GitHub prerelease and
+open it in Firefox. The signed beta remains installed after Firefox restarts
+and automatically receives newer signed beta releases from this repository.
+
+The first signed beta must replace any copy loaded through
+`about:debugging`. Browser-managed updates are not available to temporary or
+unpacked add-ons.
+
+### Temporary development copy
+
 1. Clone this repository, or choose **Code → Download ZIP** on GitHub and extract it.
 2. Open `about:debugging` in Firefox.
 3. Select **This Firefox**.
@@ -81,5 +93,21 @@ For normal installation outside the temporary-add-on workflow, follow Mozilla's 
 ## Release updates and feedback
 
 Record extension release changes in [CHANGELOG.md](CHANGELOG.md) and update the version in `manifest.json`: patch versions for routine fixes, minor versions for new functionality.
+
+Beta releases are signed by AMO and distributed from GitHub Releases. Before
+creating the first release, create AMO API credentials and add their values as
+the repository secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`.
+
+To publish a beta, commit the version and changelog changes, then push a tag
+that exactly matches the manifest version:
+
+```bash
+git tag v1.2.6
+git push origin v1.2.6
+```
+
+The release workflow validates the extension, requests an unlisted Mozilla
+signature, creates a GitHub prerelease containing the signed XPI, and updates
+`updates.json`. Never commit AMO credentials to the repository.
 
 [Report problems](https://github.com/MaWay2000/m/issues) with the extension version, Firefox version, affected workflow, and reproduction steps. Do not include private task contents, credentials, or access tokens.

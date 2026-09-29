@@ -3,6 +3,15 @@
   "name": "codex-autorun",
   "version": "1.2.6",
   "description": "The codex-autorun WebExtension with background script and popup.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "codex-autorun@maway2000.github.io",
+      "update_url": "https://raw.githubusercontent.com/MaWay2000/m/main/updates.json",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
   "permissions": [
     "storage",
     "tabs",

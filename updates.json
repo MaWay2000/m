@@ -1,0 +1,12 @@
+{
+  "addons": {
+    "codex-autorun@maway2000.github.io": {
+      "updates": [
+        {
+          "version": "1.2.6",
+          "update_link": "https://github.com/MaWay2000/m/releases/download/v1.2.6/codex-autorun-1.2.6.xpi"
+        }
+      ]
+    }
+  }
+}
